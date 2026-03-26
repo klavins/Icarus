@@ -283,14 +283,18 @@ LET M(1,2) = 99
 ### Graphics
 
 ```
-GRAPHICS 1
+GRAPHICS 1              (320x200, chunky pixels)
+GRAPHICS 2              (640x400)
+GRAPHICS 3              (800x600)
+GRAPHICS 4              (native resolution)
 COLOR 4
 PLOT 160, 100
 DRAWTO 300, 50
-DRAWTO 300, 150
-DRAWTO 160, 100
+POS 10, 10
+TEXT "HELLO"
+PRINT SCRW, SCRH        (screen dimensions)
 PAUSE
-GRAPHICS 0
+GRAPHICS 0              (back to text)
 ```
 
 ### Sound

@@ -335,6 +335,7 @@ static void collect_data(void) {
 /* ---- Keywords ---- */
 
 static enum token_type keyword_type(const char *word) {
+    if (strcmp(word, "REM") == 0)   return TOK_REM;
     if (strcmp(word, "PRINT") == 0) return TOK_PRINT;
     if (strcmp(word, "LET") == 0)   return TOK_LET;
     if (strcmp(word, "DIM") == 0)   return TOK_DIM;
@@ -507,6 +508,10 @@ int basic_tokenize(const char *input, struct token *tokens, int max) {
                 p++;
             } else {
                 t->type = keyword_type(t->string_val);
+                if (t->type == TOK_REM) {
+                    count++;
+                    goto done; /* skip rest of line */
+                }
             }
         } else if (*p == '"') {
             p++;
@@ -545,6 +550,7 @@ int basic_tokenize(const char *input, struct token *tokens, int max) {
         count++;
     }
 
+done:
     tokens[count].type = TOK_EOL;
     tokens[count].string_val[0] = '\0';
     tokens[count].number_val = 0;
@@ -818,6 +824,8 @@ static void exec_tokens(struct token *t) {
                 }
             }
         }
+    } else if (t->type == TOK_REM) {
+        /* Comment — skip */
     } else if (t->type == TOK_DATA) {
         /* DATA lines are handled by collect_data, skip at runtime */
     } else if (t->type == TOK_READ) {

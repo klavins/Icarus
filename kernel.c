@@ -105,8 +105,8 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
 
     fs_init();
     basic_init();
-    terminal_setcolor(VGA_LGREEN, VGA_BLACK);
-    terminal_print("\n ICARUS BASIC\n");
+    terminal_setcolor(VGA_WHITE, VGA_BLACK);
+    terminal_print("\n WELCOME TO ICARUS BASIC\n");
     terminal_print(" > ");
 
     char line[LINE_MAX];

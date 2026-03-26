@@ -166,13 +166,23 @@ Examples:
 
 ### GRAPHICS
 
-Switch video mode.
+Switch video mode. Mode 0 returns to text mode and restores the previous screen contents.
 
     GRAPHICS 0
     GRAPHICS 1
+    GRAPHICS 2
+    GRAPHICS 3
+    GRAPHICS 4
 
-- 0 = 80x25 text mode (restores previous screen contents)
-- 1 = 320x200 pixel mode with 256 colors
+- 0 = text mode
+- 1 = 320x200 (chunky pixels, Atari-style)
+- 2 = 640x400 (medium resolution)
+- 3 = 800x600 (high resolution)
+- 4 = native resolution (whatever the display supports)
+
+In UEFI mode, lower resolution modes scale up to fill the screen. In VGA mode, only mode 1 is available as a true hardware mode.
+
+Colors in all graphics modes use the standard VGA 256-color palette (0-255). The first 16 match the text mode colors.
 
 ### PLOT
 
@@ -189,6 +199,33 @@ Draw a line from the current graphics cursor to the given point.
     DRAWTO 100, 100
     DRAWTO 10, 100
     DRAWTO 10, 10
+
+### POS
+
+Set the graphics cursor position without drawing.
+
+    POS 100, 50
+
+### TEXT
+
+Draw text at the current graphics cursor position using the bitmap font. Uses the current COLOR. Works with string literals, string variables, and numeric expressions.
+
+    POS 10, 10
+    TEXT "HELLO WORLD"
+    POS 10, 30
+    TEXT N$
+    POS 10, 50
+    TEXT X * 2
+
+Each character is 8 pixels wide and 16 pixels tall. The cursor advances by 8 pixels after each character.
+
+### SCRW / SCRH
+
+Built-in values that return the current screen width and height in pixels. In text mode, returns the physical display resolution. In graphics mode, returns the virtual resolution of the current mode.
+
+    PRINT SCRW, SCRH
+    POS SCRW / 2 - 20, SCRH / 2
+    TEXT "CENTER"
 
 ### PAUSE
 

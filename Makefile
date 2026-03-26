@@ -16,7 +16,10 @@ KERNEL  = icarus.bin
 KERNEL_FB = icarus-fb.bin
 ISO     = icarus.iso
 
-.PHONY: all clean run iso sim docker-iso
+# Source files that affect UEFI builds
+SRCS    = $(wildcard *.c *.h *.asm)
+
+.PHONY: all clean run iso sim sim-fb sim-uefi sim-uefi64 docker-iso
 
 all: $(ISO)
 
@@ -67,7 +70,7 @@ sim-uefi: icarus-uefi.img
 		-machine pcspk-audiodev=snd \
 		-audiodev coreaudio,id=snd,timer-period=1000,out.buffer-count=2
 
-icarus-uefi.img:
+icarus-uefi.img: $(SRCS)
 	./util/build-efi
 
 sim-uefi64: icarus-uefi64.img
@@ -82,7 +85,7 @@ sim-uefi64: icarus-uefi64.img
 		-machine pcspk-audiodev=snd \
 		-audiodev coreaudio,id=snd,timer-period=1000,out.buffer-count=2
 
-icarus-uefi64.img:
+icarus-uefi64.img: $(SRCS)
 	./util/build-efi64
 
 docker-iso:

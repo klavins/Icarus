@@ -62,7 +62,8 @@ enum token_type {
     TOK_INPUT,
     TOK_PAUSE,
     TOK_POS,
-    TOK_TEXT
+    TOK_TEXT,
+    TOK_REM
 };
 
 struct token {
