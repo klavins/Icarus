@@ -60,7 +60,9 @@ enum token_type {
     TOK_PLOT,
     TOK_DRAWTO,
     TOK_INPUT,
-    TOK_PAUSE
+    TOK_PAUSE,
+    TOK_POS,
+    TOK_TEXT
 };
 
 struct token {

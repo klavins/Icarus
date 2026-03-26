@@ -10,9 +10,13 @@ static inline void cpuid(uint32_t leaf, uint32_t *eax, uint32_t *ebx,
 }
 
 static inline uint32_t read_eflags(void) {
-    uint32_t flags;
+    unsigned long flags;
+#ifdef __x86_64__
+    asm volatile ("pushfq; popq %0" : "=r"(flags));
+#else
     asm volatile ("pushfl; popl %0" : "=r"(flags));
-    return flags;
+#endif
+    return (uint32_t)flags;
 }
 
 static int check_multiboot(uint32_t magic) {

@@ -1,0 +1,68 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+cd "$PROJECT_DIR"
+
+# Build Docker image if needed
+if ! docker image inspect icarus-efi >/dev/null 2>&1; then
+    echo "Building Docker image..."
+    docker build --platform linux/amd64 -t icarus-efi -f Dockerfile.efi . 2>&1
+fi
+
+echo "Building 64-bit UEFI image..."
+
+docker run --rm --platform linux/amd64 -v "$PROJECT_DIR":/src -w /src icarus-efi bash -c '
+set -e
+
+CC=gcc
+OBJCOPY=objcopy
+
+CFLAGS="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -mno-sse -mno-mmx -mno-sse2 -I/usr/include/efi -I/usr/include/efi/x86_64 -DUEFI_BUILD -DGNU_EFI"
+
+mkdir -p build-efi64
+
+echo "==> Compiling (64-bit)..."
+for f in uefi_boot64.c fbconsole.c klib.c boot_info.c keyboard.c speaker.c ata.c fs.c graphics.c basic.c kernel.c; do
+    echo "    $f"
+    $CC -c $CFLAGS "$f" -o "build-efi64/${f%.c}.o"
+done
+
+echo "==> Linking..."
+ld -nostdlib -znocombreloc -T /usr/lib/elf_x86_64_efi.lds -shared \
+    -Bsymbolic --allow-multiple-definition \
+    /usr/lib/crt0-efi-x86_64.o \
+    build-efi64/uefi_boot64.o \
+    build-efi64/fbconsole.o \
+    build-efi64/klib.o \
+    build-efi64/boot_info.o \
+    build-efi64/keyboard.o \
+    build-efi64/speaker.o \
+    build-efi64/ata.o \
+    build-efi64/fs.o \
+    build-efi64/graphics.o \
+    build-efi64/basic.o \
+    build-efi64/kernel.o \
+    -L /usr/lib -lefi -lgnuefi \
+    -o build-efi64/icarus64.so
+
+echo "==> Converting to PE..."
+$OBJCOPY -j .text -j .sdata -j .data -j .dynamic -j .dynsym -j .rel \
+    -j .rela -j .rel.* -j .rela.* -j .reloc -j .rodata \
+    --target=efi-app-x86_64 \
+    build-efi64/icarus64.so build-efi64/BOOTX64.EFI
+
+echo "==> Creating FAT boot image..."
+dd if=/dev/zero of=icarus-uefi64.img bs=1M count=33 2>/dev/null
+mkfs.vfat -F 32 icarus-uefi64.img >/dev/null
+
+mmd -i icarus-uefi64.img ::/EFI
+mmd -i icarus-uefi64.img ::/EFI/BOOT
+mcopy -i icarus-uefi64.img build-efi64/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI
+
+echo "==> Done!"
+ls -la build-efi64/BOOTX64.EFI
+ls -la icarus-uefi64.img
+'

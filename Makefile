@@ -70,9 +70,24 @@ sim-uefi: icarus-uefi.img
 icarus-uefi.img:
 	./util/build-efi
 
+sim-uefi64: icarus-uefi64.img
+	cp $(OVMF_VARS) /tmp/ovmf-vars.fd
+	qemu-system-x86_64 \
+		-drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-x86_64-code.fd \
+		-drive if=pflash,format=raw,file=/tmp/ovmf-vars.fd \
+		-drive format=raw,file=icarus-uefi64.img,if=none,id=boot -device ide-hd,drive=boot,bus=ide.1 \
+		-drive file=disk.img,format=raw,if=none,id=data -device ide-hd,drive=data,bus=ide.0 \
+		-m 256 -smp 1 -net none \
+		-display cocoa,zoom-to-fit=on -full-screen \
+		-machine pcspk-audiodev=snd \
+		-audiodev coreaudio,id=snd,timer-period=1000,out.buffer-count=2
+
+icarus-uefi64.img:
+	./util/build-efi64
+
 docker-iso:
 	docker run --rm --platform linux/amd64 -v "$(CURDIR)":/src -w /src ubuntu:latest bash -c \
 		"apt-get update -qq && apt-get install -y -qq nasm gcc-i686-linux-gnu make grub-pc-bin xorriso >/dev/null 2>&1 && make clean && make iso CC=i686-linux-gnu-gcc LD=i686-linux-gnu-gcc"
 
 clean:
-	rm -rf $(BUILD) build-efi $(KERNEL) $(KERNEL_FB) icarus-uefi.img $(ISO) isodir
+	rm -rf $(BUILD) build-efi build-efi64 $(KERNEL) $(KERNEL_FB) icarus-uefi.img icarus-uefi64.img $(ISO) isodir

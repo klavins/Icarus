@@ -1,6 +1,6 @@
 # ICARUS
 
-A bare-metal 32-bit x86 operating system with a built-in BASIC interpreter, inspired by the Atari 800. Boots on both legacy BIOS and modern UEFI systems.
+A bare-metal x86 operating system with a built-in BASIC interpreter, inspired by the Atari 800. Boots on both legacy BIOS and modern 64-bit UEFI systems. Tested on real hardware (AMD Ryzen 5 2600X, NVIDIA GPUs, American Megatrends UEFI).
 
 ## What is this?
 
@@ -18,8 +18,8 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 ## Features
 
 ### Operating System
-- 32-bit x86 protected mode kernel
-- Boots via Multiboot (GRUB/QEMU) or UEFI
+- Boots via Multiboot (GRUB/QEMU), 32-bit UEFI, or 64-bit UEFI
+- 32-bit kernel for BIOS/Multiboot, 64-bit kernel for UEFI
 - VGA text mode (80x25) for BIOS boot
 - GOP framebuffer rendering with bitmap font for UEFI boot
 - VGA Mode 13h graphics (320x200, 256 colors) for BIOS boot
@@ -49,9 +49,13 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 - `i686-elf-gcc` (cross-compiler)
 - `qemu-system-i386`
 
-### For UEFI boot (make sim-uefi)
+### For UEFI boot (make sim-uefi / make sim-uefi64)
 - Everything above
 - Docker (for building the EFI binary)
+
+### For real hardware (USB stick)
+- Everything above
+- A USB stick (any size)
 
 ### Cross-compiler
 
@@ -71,7 +75,7 @@ make clean && make sim
 make clean && make sim-fb
 ```
 
-### UEFI mode (modern hardware, full resolution)
+### UEFI mode — 32-bit (for QEMU i386)
 
 First build the Docker image (one time):
 
@@ -85,6 +89,40 @@ Then build and run:
 ./util/build-efi
 make sim-uefi
 ```
+
+### UEFI mode — 64-bit (for QEMU x86_64 and real hardware)
+
+```
+./util/build-efi64
+make sim-uefi64
+```
+
+### Bootable USB stick (64-bit UEFI, for real hardware)
+
+Build a properly partitioned GPT image:
+
+```
+./util/build-efi64
+./util/make-usb-img
+```
+
+Write to USB (on macOS):
+
+```
+diskutil list                              # find your USB device
+diskutil unmountDisk /dev/diskN
+sudo dd if=icarus-usb.img of=/dev/rdiskN bs=1M
+```
+
+Write to USB (on Linux):
+
+```
+lsblk                                     # find your USB device
+sudo dd if=icarus-usb.img of=/dev/sdX bs=1M
+sync
+```
+
+Then boot from the USB stick via the UEFI boot menu (usually F8, F12, or DEL at power-on).
 
 ### Bootable ISO (for USB sticks, legacy BIOS PCs)
 
@@ -190,7 +228,8 @@ RUN
 ### UEFI Boot
 | File | Description |
 |------|-------------|
-| `uefi_boot.c` | UEFI entry point, GOP framebuffer setup, ExitBootServices |
+| `uefi_boot.c` | 32-bit UEFI entry point (for QEMU i386) |
+| `uefi_boot64.c` | 64-bit UEFI entry point (for real hardware and QEMU x86_64) |
 | `uefi.h` | Minimal UEFI type definitions |
 | `uefi_stubs.c` | MinGW runtime stubs for freestanding build |
 | `Dockerfile.efi` | Docker image for UEFI cross-compilation |
@@ -199,7 +238,9 @@ RUN
 | File | Description |
 |------|-------------|
 | `util/idu` | Host-side disk image utility (Python) |
-| `util/build-efi` | UEFI build script (runs in Docker) |
+| `util/build-efi` | 32-bit UEFI build script (runs in Docker) |
+| `util/build-efi64` | 64-bit UEFI build script (runs in Docker) |
+| `util/make-usb-img` | Create GPT-partitioned USB boot image |
 
 ## BASIC Quick Reference
 
@@ -299,7 +340,19 @@ Any PC from before ~2015 with a VGA port and Legacy/CSM boot support will work. 
 
 ### Modern UEFI PC
 
-The UEFI build (`./util/build-efi`) produces a FAT32 image that can be written to a USB stick. The target PC must support 32-bit UEFI (IA32). Most modern PCs use 64-bit UEFI, so a 64-bit build would be needed for broad compatibility (not yet implemented).
+Build a bootable USB with `./util/build-efi64` and `./util/make-usb-img`, then write `icarus-usb.img` to a USB stick. This produces a 64-bit UEFI application with a proper GPT partition table.
+
+Successfully tested on:
+- AMD Ryzen 5 2600X / ASUS motherboard / NVIDIA GPUs / American Megatrends UEFI
+- Display: 1024x768 via GOP framebuffer
+- 64GB RAM detected
+
+### Hardware Notes
+
+- **Keyboard**: A PS/2 keyboard is required. USB keyboards rely on UEFI PS/2 emulation which stops working after ExitBootServices. Most ASUS and similar motherboards have a PS/2 port on the back panel.
+- **Display**: ICARUS uses the UEFI GOP framebuffer. On multi-GPU systems, make sure your monitor is connected to the GPU marked as `boot_vga` (check with `cat /sys/bus/pci/devices/*/boot_vga` from Linux).
+- **Disk**: The ATA PIO driver works with legacy PATA/IDE drives and QEMU virtual disks. SATA and NVMe drives on real hardware are not yet supported — BASIC works fine without a disk, you just can't save/load programs.
+- **BIOS Setup**: If you can't enter BIOS setup, try clearing CMOS by removing the motherboard coin battery for 30 seconds with power disconnected.
 
 ## Documentation
 

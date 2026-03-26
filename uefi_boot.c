@@ -22,14 +22,15 @@ struct framebuffer_info {
  * Boot info collected from UEFI, passed to the kernel.
  */
 struct uefi_boot_info {
+    uint32_t fb_addr;
     uint32_t fb_width;
     uint32_t fb_height;
     uint32_t fb_pitch;
     uint32_t fb_bpp;
-    uint32_t total_memory_kb;   /* approximate total RAM */
+    uint32_t total_memory_kb;
     char     firmware_vendor[64];
     uint32_t firmware_revision;
-    uint32_t pixel_format;      /* 0=RGBR, 1=BGRR */
+    uint32_t pixel_format;
 };
 
 /* Globals read by fbconsole and kernel */
@@ -94,6 +95,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
     fb_info.pitch  = gop->Mode->Info->PixelsPerScanLine;
     fb_info.bpp    = 4;
 
+    uefi_info.fb_addr   = (uint32_t)(UINTN)fb_info.addr;
     uefi_info.fb_width  = fb_info.width;
     uefi_info.fb_height = fb_info.height;
     uefi_info.fb_pitch  = fb_info.pitch;

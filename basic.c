@@ -368,6 +368,8 @@ static enum token_type keyword_type(const char *word) {
     if (strcmp(word, "DRAWTO") == 0)   return TOK_DRAWTO;
     if (strcmp(word, "INPUT") == 0)    return TOK_INPUT;
     if (strcmp(word, "PAUSE") == 0)    return TOK_PAUSE;
+    if (strcmp(word, "POS") == 0)      return TOK_POS;
+    if (strcmp(word, "TEXT") == 0)     return TOK_TEXT;
     return TOK_IDENT;
 }
 
@@ -386,6 +388,11 @@ static int parse_factor(void) {
     if (tok_pos->type == TOK_IDENT) {
         const char *name = tok_pos->string_val;
         tok_pos++;
+
+        /* Built-in functions */
+        if (strcmp(name, "SCRW") == 0) return gfx_width();
+        if (strcmp(name, "SCRH") == 0) return gfx_height();
+
         if (tok_pos->type == TOK_LPAREN) {
             /* Array access: A(expr) or A(expr, expr) */
             tok_pos++;
@@ -873,7 +880,7 @@ static void exec_tokens(struct token *t) {
         t++;
         tok_pos = t;
         int val = parse_expr();
-        if (gfx_get_mode() == 1)
+        if (gfx_get_mode() >= 1)
             gfx_set_color(val);
         else
             terminal_setcolor(val, VGA_BLACK);
@@ -983,6 +990,29 @@ static void exec_tokens(struct token *t) {
     } else if (t->type == TOK_PAUSE) {
         /* PAUSE — wait for any keypress */
         keyboard_poll();
+    } else if (t->type == TOK_POS) {
+        /* POS x, y */
+        t++;
+        tok_pos = t;
+        int x = parse_expr();
+        if (tok_pos->type == TOK_COMMA) tok_pos++;
+        int y = parse_expr();
+        gfx_pos(x, y);
+    } else if (t->type == TOK_TEXT) {
+        /* TEXT "string" or TEXT A$ */
+        t++;
+        if (t->type == TOK_STRING) {
+            gfx_text(t->string_val);
+        } else if (t->type == TOK_STRIDENT) {
+            gfx_text(strvar_get(t->string_val));
+        } else {
+            /* Evaluate as expression and print the number */
+            tok_pos = t;
+            int val = parse_expr();
+            char buf[32];
+            sprintf(buf, "%d", val);
+            gfx_text(buf);
+        }
     } else {
         terminal_print("?SYNTAX ERROR\n");
     }

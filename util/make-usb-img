@@ -1,0 +1,53 @@
+#!/bin/bash
+set -e
+
+# Create a proper GPT disk image with an EFI System Partition
+# containing BOOTX64.EFI
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+cd "$PROJECT_DIR"
+
+if [ ! -f build-efi64/BOOTX64.EFI ]; then
+    echo "Error: build-efi64/BOOTX64.EFI not found. Run ./util/build-efi64 first."
+    exit 1
+fi
+
+echo "Creating GPT disk image..."
+
+docker run --rm --platform linux/amd64 -v "$PROJECT_DIR":/src -w /src icarus-efi bash -c '
+set -e
+apt-get update -qq && apt-get install -y -qq gdisk mtools dosfstools >/dev/null 2>&1
+
+IMG=icarus-usb.img
+
+# Create 64MB disk image
+dd if=/dev/zero of=$IMG bs=1M count=64 2>/dev/null
+
+# Create GPT partition table with one EFI System Partition
+# Using sgdisk (part of gdisk)
+sgdisk --clear $IMG
+sgdisk --new=1:2048:131038 --typecode=1:EF00 --change-name=1:"EFI System" $IMG
+
+# Format the partition as FAT32
+# The partition starts at sector 2048 (1MB offset), calculate byte offset
+OFFSET=$((2048 * 512))
+SIZE=$(((131038 - 2048 + 1) * 512))
+
+# Extract partition, format it, put it back
+dd if=$IMG of=part.img bs=512 skip=2048 count=$((131038 - 2048 + 1)) 2>/dev/null
+mkfs.vfat -F 32 part.img >/dev/null
+
+# Copy EFI file
+mmd -i part.img ::/EFI
+mmd -i part.img ::/EFI/BOOT
+mcopy -i part.img build-efi64/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI
+
+# Write partition back
+dd if=part.img of=$IMG bs=512 seek=2048 conv=notrunc 2>/dev/null
+rm part.img
+
+echo "Done!"
+ls -la $IMG
+'

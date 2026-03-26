@@ -31,6 +31,20 @@ struct framebuffer_info {
 };
 extern struct framebuffer_info fb_info __attribute__((weak));
 
+/* Fixed-address struct from 64-bit UEFI boot */
+struct framebuffer_info_fixed {
+    uint32_t addr_lo;
+    uint32_t width;
+    uint32_t height;
+    uint32_t pitch;
+    uint32_t bpp;
+    uint32_t total_memory_kb;
+    char     firmware_vendor[64];
+    uint32_t firmware_revision;
+    uint32_t pixel_format;
+};
+#define FB_INFO_FIXED ((volatile struct framebuffer_info_fixed *)0x00080000)
+
 /* 32-bit BGRA colors for UEFI GOP */
 static const uint32_t color32_map[16] = {
     0x00000000,  /* black */
@@ -143,13 +157,20 @@ static void init_mode13h(void) {
 }
 
 void terminal_init(void) {
-    /* Check if UEFI provided a framebuffer */
+    /* Check if 32-bit UEFI provided a framebuffer (weak symbol) */
     if (&fb_info && fb_info.addr && fb_info.width > 0) {
         fb_addr   = (uint8_t *)fb_info.addr;
         fb_width  = fb_info.width;
         fb_height = fb_info.height;
         fb_pitch  = fb_info.pitch * fb_info.bpp;
         fb_bpp    = fb_info.bpp;
+    /* Check if 64-bit UEFI stored fb info at fixed address */
+    } else if (FB_INFO_FIXED->addr_lo != 0 && FB_INFO_FIXED->width > 0) {
+        fb_addr   = (uint8_t *)(uintptr_t)FB_INFO_FIXED->addr_lo;
+        fb_width  = FB_INFO_FIXED->width;
+        fb_height = FB_INFO_FIXED->height;
+        fb_pitch  = FB_INFO_FIXED->pitch * FB_INFO_FIXED->bpp;
+        fb_bpp    = FB_INFO_FIXED->bpp;
     } else {
         /* Fall back to VGA Mode 13h */
         init_mode13h();

@@ -11,6 +11,7 @@
 #define MBOOT_MAGIC 0x2BADB002
 
 struct uefi_boot_info {
+    uint32_t fb_addr;           /* 32-bit UEFI: pointer; 64-bit UEFI: low 32 bits */
     uint32_t fb_width;
     uint32_t fb_height;
     uint32_t fb_pitch;
@@ -21,6 +22,9 @@ struct uefi_boot_info {
     uint32_t pixel_format;
 };
 extern struct uefi_boot_info uefi_info __attribute__((weak));
+
+/* 64-bit UEFI boot stores info at this fixed address */
+#define UEFI_INFO_FIXED ((volatile struct uefi_boot_info *)0x00080000)
 
 static inline void cpuid(uint32_t leaf, uint32_t *eax, uint32_t *ebx,
                           uint32_t *ecx, uint32_t *edx) {
@@ -64,19 +68,29 @@ static void print_disk_info(void) {
 }
 
 static void print_uefi_info(void) {
+    /* Find the boot info — either from weak symbol or fixed address */
+    volatile struct uefi_boot_info *info = 0;
+    if (&uefi_info && uefi_info.fb_width > 0)
+        info = (volatile struct uefi_boot_info *)&uefi_info;
+    else if (UEFI_INFO_FIXED->fb_width > 0)
+        info = UEFI_INFO_FIXED;
+
     terminal_setcolor(VGA_GREEN, VGA_BLACK);
     terminal_print(" UEFI Boot\n");
     terminal_setcolor(VGA_LCYAN, VGA_BLACK);
-    terminal_printf(" Firmware: %s (rev %d)\n",
-                    uefi_info.firmware_vendor,
-                    uefi_info.firmware_revision);
-    terminal_printf(" Display: %dx%d, %d bpp\n",
-                    uefi_info.fb_width,
-                    uefi_info.fb_height,
-                    uefi_info.fb_bpp * 8);
-    terminal_printf(" Memory: %d KB (%d MB)\n",
-                    uefi_info.total_memory_kb,
-                    uefi_info.total_memory_kb / 1024);
+
+    if (info) {
+        terminal_printf(" Firmware: %s (rev %d)\n",
+                        (const char *)info->firmware_vendor,
+                        info->firmware_revision);
+        terminal_printf(" Display: %dx%d, %d bpp\n",
+                        info->fb_width,
+                        info->fb_height,
+                        info->fb_bpp * 8);
+        terminal_printf(" Memory: %d KB (%d MB)\n",
+                        info->total_memory_kb,
+                        info->total_memory_kb / 1024);
+    }
     print_cpu_info();
     print_disk_info();
 }
@@ -86,7 +100,7 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
     terminal_init();
     if (magic == MBOOT_MAGIC)
         boot_info_print(magic, mboot);
-    else if (&uefi_info)
+    else
         print_uefi_info();
 
     fs_init();
