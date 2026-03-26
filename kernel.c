@@ -22,6 +22,34 @@ struct uefi_boot_info {
 };
 extern struct uefi_boot_info uefi_info __attribute__((weak));
 
+static inline void cpuid(uint32_t leaf, uint32_t *eax, uint32_t *ebx,
+                          uint32_t *ecx, uint32_t *edx) {
+    asm volatile ("cpuid"
+        : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
+        : "a"(leaf));
+}
+
+static void print_cpu_info(void) {
+    uint32_t eax, ebx, ecx, edx;
+
+    cpuid(0, &eax, &ebx, &ecx, &edx);
+    char vendor[13];
+    *(uint32_t *)&vendor[0] = ebx;
+    *(uint32_t *)&vendor[4] = edx;
+    *(uint32_t *)&vendor[8] = ecx;
+    vendor[12] = '\0';
+    terminal_printf(" CPU: %s", vendor);
+
+    cpuid(1, &eax, &ebx, &ecx, &edx);
+    uint32_t family = (eax >> 8) & 0xF;
+    uint32_t model  = (eax >> 4) & 0xF;
+    if (family == 0xF)
+        family += (eax >> 20) & 0xFF;
+    if (family == 0x6 || family == 0xF)
+        model += ((eax >> 16) & 0xF) << 4;
+    terminal_printf(" family %d model %d\n", family, model);
+}
+
 static void print_disk_info(void) {
     uint32_t sectors = ata_get_total_sectors();
     if (sectors > 0) {
@@ -49,6 +77,7 @@ static void print_uefi_info(void) {
     terminal_printf(" Memory: %d KB (%d MB)\n",
                     uefi_info.total_memory_kb,
                     uefi_info.total_memory_kb / 1024);
+    print_cpu_info();
     print_disk_info();
 }
 
