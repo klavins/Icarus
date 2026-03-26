@@ -1062,9 +1062,11 @@ void basic_exec(const char *line) {
     /* QUIT command — shutdown */
     if (tokens[0].type == TOK_QUIT) {
         terminal_print("SHUTTING DOWN...\n");
-        /* QEMU ACPI shutdown (piix4 PM port) */
-        outw(0x604, 0x2000);
-        /* Halt if that didn't work */
+        /* Try multiple QEMU shutdown methods */
+        outw(0x604, 0x2000);   /* PIIX4 ACPI (BIOS mode) */
+        outw(0xB004, 0x2000);  /* Bochs/old QEMU */
+        outw(0x4004, 0x3400);  /* QEMU Q35/UEFI */
+        /* Halt if none worked */
         asm volatile ("cli; hlt");
         return;
     }

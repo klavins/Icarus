@@ -35,6 +35,10 @@ static void terminal_scroll(void) {
         VGA_MEMORY[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = vga_entry(' ', terminal_color);
 }
 
+void terminal_init(void) {
+    /* Text mode — nothing to do, VGA is already in mode 03h */
+}
+
 void terminal_setcolor(enum vga_color fg, enum vga_color bg) {
     terminal_color = fg | bg << 4;
 }
@@ -93,4 +97,14 @@ void terminal_printf(const char *fmt, ...) {
 
 size_t terminal_getcol(void) {
     return cursor_col;
+}
+
+void terminal_get_fb(uint8_t **addr, uint32_t *width, uint32_t *height,
+                     uint32_t *pitch, uint32_t *bpp) {
+    /* VGA text mode — no framebuffer to share */
+    *addr   = 0;
+    *width  = 0;
+    *height = 0;
+    *pitch  = 0;
+    *bpp    = 0;
 }

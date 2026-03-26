@@ -1,0 +1,68 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+cd "$PROJECT_DIR"
+
+# Build Docker image if needed
+if ! docker image inspect icarus-efi >/dev/null 2>&1; then
+    echo "Building Docker image..."
+    docker build --platform linux/amd64 -t icarus-efi -f Dockerfile.efi . 2>&1
+fi
+
+echo "Building UEFI image..."
+
+docker run --rm --platform linux/amd64 -v "$PROJECT_DIR":/src -w /src icarus-efi bash -c '
+set -e
+
+CC=gcc
+OBJCOPY=objcopy
+CFLAGS="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -mno-sse -mno-mmx -mno-sse2 -m32 -march=i686 -I/usr/include/efi -I/usr/include/efi/ia32 -DUEFI_BUILD -DGNU_EFI"
+
+echo "==> Compiling..."
+mkdir -p build-efi
+
+for f in uefi_boot.c uefi_stubs.c fbconsole.c klib.c boot_info.c keyboard.c speaker.c ata.c fs.c graphics.c basic.c kernel.c; do
+    echo "    $f"
+    $CC -c $CFLAGS "$f" -o "build-efi/${f%.c}.o"
+done
+
+echo "==> Linking..."
+ld -m elf_i386 -nostdlib -znocombreloc -T /usr/lib32/elf_ia32_efi.lds -shared \
+    -Bsymbolic --allow-multiple-definition \
+    /usr/lib32/crt0-efi-ia32.o \
+    build-efi/uefi_boot.o \
+    build-efi/uefi_stubs.o \
+    build-efi/fbconsole.o \
+    build-efi/klib.o \
+    build-efi/boot_info.o \
+    build-efi/keyboard.o \
+    build-efi/speaker.o \
+    build-efi/ata.o \
+    build-efi/fs.o \
+    build-efi/graphics.o \
+    build-efi/basic.o \
+    build-efi/kernel.o \
+    -L /usr/lib32 -lefi -lgnuefi \
+    -o build-efi/icarus.so
+
+echo "==> Converting to PE..."
+$OBJCOPY -j .text -j .sdata -j .data -j .dynamic -j .dynsym -j .rel \
+    -j .rela -j .rel.* -j .rela.* -j .reloc -j .rodata \
+    --target=efi-app-ia32 \
+    build-efi/icarus.so build-efi/BOOTIA32.EFI
+
+echo "==> Creating FAT boot image..."
+dd if=/dev/zero of=icarus-uefi.img bs=1M count=33 2>/dev/null
+mkfs.vfat -F 32 icarus-uefi.img >/dev/null
+
+mmd -i icarus-uefi.img ::/EFI
+mmd -i icarus-uefi.img ::/EFI/BOOT
+mcopy -i icarus-uefi.img build-efi/BOOTIA32.EFI ::/EFI/BOOT/BOOTIA32.EFI
+
+echo "==> Done!"
+ls -la build-efi/BOOTIA32.EFI
+ls -la icarus-uefi.img
+'
