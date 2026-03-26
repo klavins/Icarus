@@ -380,6 +380,24 @@ static struct token *tok_pos;
 
 static int parse_expr(void);
 
+/* Simple linear congruential PRNG — seeded from PIT timer on first call */
+static uint32_t rng_state;
+static int rng_seeded;
+
+static int basic_rnd(int n) {
+    if (!rng_seeded) {
+        /* Seed from PIT channel 0 counter — different each boot */
+        outb(0x43, 0x00); /* latch counter 0 */
+        uint32_t lo = inb(0x40);
+        uint32_t hi = inb(0x40);
+        rng_state = (hi << 8) | lo | 0x10000;
+        rng_seeded = 1;
+    }
+    rng_state = rng_state * 1103515245 + 12345;
+    if (n <= 0) return 0;
+    return (int)((rng_state >> 16) % (uint32_t)n);
+}
+
 static int parse_factor(void) {
     if (tok_pos->type == TOK_NUMBER) {
         int val = tok_pos->number_val;
@@ -390,11 +408,42 @@ static int parse_factor(void) {
         const char *name = tok_pos->string_val;
         tok_pos++;
 
-        /* Built-in functions */
+        /* Built-in values */
         if (strcmp(name, "SCRW") == 0) return gfx_width();
         if (strcmp(name, "SCRH") == 0) return gfx_height();
 
+        /* Built-in functions */
         if (tok_pos->type == TOK_LPAREN) {
+            if (strcmp(name, "RND") == 0) {
+                tok_pos++;
+                int n = parse_expr();
+                if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                return basic_rnd(n);
+            }
+            if (strcmp(name, "ABS") == 0) {
+                tok_pos++;
+                int n = parse_expr();
+                if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                return n < 0 ? -n : n;
+            }
+            if (strcmp(name, "LEN") == 0) {
+                tok_pos++;
+                if (tok_pos->type == TOK_STRIDENT) {
+                    int len = strlen(strvar_get(tok_pos->string_val));
+                    tok_pos++;
+                    if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                    return len;
+                }
+                if (tok_pos->type == TOK_STRING) {
+                    int len = strlen(tok_pos->string_val);
+                    tok_pos++;
+                    if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                    return len;
+                }
+                if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                return 0;
+            }
+
             /* Array access: A(expr) or A(expr, expr) */
             tok_pos++;
             int i1 = parse_expr();
