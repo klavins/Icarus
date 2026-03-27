@@ -79,19 +79,7 @@ static void dos_menu(void) {
         } else if (c == 's' || c == 'S') {
             terminal_print(" Filename: ");
             char name[FS_NAME_LEN];
-            int pos = 0;
-            for (;;) {
-                char k = keyboard_poll();
-                if (k == '\n') break;
-                if (k == '\b' && pos > 0) { pos--; terminal_putchar('\b'); continue; }
-                if (k && pos < FS_NAME_LEN - 1) {
-                    name[pos++] = k;
-                    terminal_putchar(k);
-                }
-            }
-            name[pos] = '\0';
-            terminal_putchar('\n');
-            if (pos > 0) {
+            if (read_line(name, FS_NAME_LEN) > 0) {
                 static char savebuf[16384];
                 int size = basic_program_serialize(savebuf, sizeof(savebuf));
                 if (size > 0) {
@@ -104,19 +92,7 @@ static void dos_menu(void) {
         } else if (c == 'l' || c == 'L') {
             terminal_print(" Filename: ");
             char name[FS_NAME_LEN];
-            int pos = 0;
-            for (;;) {
-                char k = keyboard_poll();
-                if (k == '\n') break;
-                if (k == '\b' && pos > 0) { pos--; terminal_putchar('\b'); continue; }
-                if (k && pos < FS_NAME_LEN - 1) {
-                    name[pos++] = k;
-                    terminal_putchar(k);
-                }
-            }
-            name[pos] = '\0';
-            terminal_putchar('\n');
-            if (pos > 0) {
+            if (read_line(name, FS_NAME_LEN) > 0) {
                 static char loadbuf[16384];
                 int size = fs_load(name, loadbuf, sizeof(loadbuf));
                 if (size > 0) {
@@ -127,19 +103,7 @@ static void dos_menu(void) {
         } else if (c == 'e' || c == 'E') {
             terminal_print(" Filename: ");
             char name[FS_NAME_LEN];
-            int pos = 0;
-            for (;;) {
-                char k = keyboard_poll();
-                if (k == '\n') break;
-                if (k == '\b' && pos > 0) { pos--; terminal_putchar('\b'); continue; }
-                if (k && pos < FS_NAME_LEN - 1) {
-                    name[pos++] = k;
-                    terminal_putchar(k);
-                }
-            }
-            name[pos] = '\0';
-            terminal_putchar('\n');
-            if (pos > 0) {
+            if (read_line(name, FS_NAME_LEN) > 0) {
                 if (fs_delete(name) == 0)
                     terminal_print(" Deleted.\n");
             }

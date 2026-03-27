@@ -14,15 +14,15 @@
 
 /* ---- Constants ---- */
 
-#define MAX_VARS       64
-#define MAX_VAR_NAME   16
-#define MAX_STR_LEN    128
-#define MAX_ARRAY_SIZE 1024
-#define MAX_LINES      256
-#define MAX_LINE_LEN   80
-#define MAX_FOR_DEPTH  8
-#define MAX_GOSUB_DEPTH 16
-#define MAX_DATA       1024
+#define MAX_VARS       128
+#define MAX_VAR_NAME   32
+#define MAX_STR_LEN    256
+#define MAX_ARRAY_SIZE 4096
+#define MAX_LINES      10000
+#define MAX_LINE_LEN   256
+#define MAX_FOR_DEPTH  32
+#define MAX_GOSUB_DEPTH 64
+#define MAX_DATA       4096
 
 /* ---- Program store (defined in basic.c) ---- */
 
@@ -107,5 +107,7 @@ void exec_tokens(struct token *t);
 void run_program(void);
 void list_program(void);
 void collect_data(void);
+int  read_line(char *buf, int max);
+double parse_number_string(const char *buf);
 
 #endif
