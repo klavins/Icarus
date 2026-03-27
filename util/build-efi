@@ -19,14 +19,15 @@ set -e
 
 CC=gcc
 OBJCOPY=objcopy
-CFLAGS="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -mno-sse -mno-mmx -mno-sse2 -m32 -march=i686 -I/usr/include/efi -I/usr/include/efi/ia32 -DUEFI_BUILD -DGNU_EFI"
+CFLAGS="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -mno-sse -mno-mmx -mno-sse2 -m32 -march=i686 -I os -I lib -I basic -I boot -I/usr/include/efi -I/usr/include/efi/ia32 -DUEFI_BUILD -DGNU_EFI"
 
 echo "==> Compiling..."
 mkdir -p build-efi
 
-for f in uefi_boot.c uefi_stubs.c fbconsole.c klib.c boot_info.c keyboard.c speaker.c ata.c fs.c graphics.c basic_vars.c basic_token.c basic_expr.c basic_exec.c basic.c kernel.c; do
+for f in uefi_boot.c uefi_stubs.c os/fbconsole.c lib/klib.c boot/boot_info.c os/keyboard.c os/speaker.c os/ata.c os/fs.c os/graphics.c basic/basic_vars.c basic/basic_token.c basic/basic_expr.c basic/basic_exec.c basic/basic.c kernel.c; do
+    base=$(basename "$f" .c)
     echo "    $f"
-    $CC -c $CFLAGS "$f" -o "build-efi/${f%.c}.o"
+    $CC -c $CFLAGS "$f" -o "build-efi/${base}.o"
 done
 
 echo "==> Linking..."

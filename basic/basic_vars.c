@@ -1,4 +1,5 @@
 #include "basic_internal.h"
+#include "klib.h"
 
 /* ---- Bump allocator ---- */
 

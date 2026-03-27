@@ -20,19 +20,20 @@ set -e
 CC=gcc
 OBJCOPY=objcopy
 
-CFLAGS_BASE="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -fcf-protection=none -I/usr/include/efi -I/usr/include/efi/x86_64 -DUEFI_BUILD -DGNU_EFI"
+CFLAGS_BASE="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -fcf-protection=none -I os -I lib -I basic -I boot -I/usr/include/efi -I/usr/include/efi/x86_64 -DUEFI_BUILD -DGNU_EFI"
 CFLAGS="$CFLAGS_BASE"
 CFLAGS_NOSSE="$CFLAGS_BASE -mno-sse -mno-mmx -mno-sse2"
 
 mkdir -p build-efi64
 
 echo "==> Compiling (64-bit)..."
-for f in uefi_boot64.c fbconsole.c klib.c math.c boot_info.c keyboard.c speaker.c ata.c fs.c graphics.c os.c basic_vars.c basic_token.c basic_expr.c basic_exec.c basic.c kernel.c; do
+for f in boot/uefi_boot64.c os/fbconsole.c lib/klib.c lib/math.c boot/boot_info.c os/keyboard.c os/speaker.c os/ata.c os/fs.c os/graphics.c os/os.c basic/basic_vars.c basic/basic_token.c basic/basic_expr.c basic/basic_exec.c basic/basic.c boot/kernel.c; do
+    base=$(basename "$f" .c)
     echo "    $f"
-    $CC -c $CFLAGS "$f" -o "build-efi64/${f%.c}.o"
+    $CC -c $CFLAGS "$f" -o "build-efi64/${base}.o"
 done
 echo "    interrupts.c (no SSE)"
-$CC -c $CFLAGS_NOSSE interrupts.c -o build-efi64/interrupts.o
+$CC -c $CFLAGS_NOSSE os/interrupts.c -o build-efi64/interrupts.o
 
 echo "==> Linking..."
 ld -nostdlib -znocombreloc -T /usr/lib/elf_x86_64_efi.lds -shared \

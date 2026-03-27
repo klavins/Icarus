@@ -3,15 +3,17 @@ CC      = i686-elf-gcc
 LD      = i686-elf-gcc
 
 ASFLAGS = -f elf32
-CFLAGS  = -std=gnu99 -ffreestanding -O2 -Wall -Wextra
+CFLAGS  = -std=gnu99 -ffreestanding -O2 -Wall -Wextra -I os -I lib -I basic -I boot
 LDFLAGS = -T linker.ld -ffreestanding -O2 -nostdlib -lgcc
 
 BUILD   = build
 COMMON  = $(BUILD)/boot.o $(BUILD)/klib.o $(BUILD)/boot_info.o \
-          $(BUILD)/keyboard.o $(BUILD)/speaker.o $(BUILD)/ata.o $(BUILD)/fs.o \
-          $(BUILD)/graphics.o $(BUILD)/interrupts.o $(BUILD)/math.o $(BUILD)/os.o \
-          $(BUILD)/basic_vars.o $(BUILD)/basic_token.o $(BUILD)/basic_expr.o \
-          $(BUILD)/basic_exec.o $(BUILD)/basic.o $(BUILD)/kernel.o
+          $(BUILD)/kernel.o \
+          $(BUILD)/os.o $(BUILD)/graphics.o \
+          $(BUILD)/keyboard.o $(BUILD)/interrupts.o $(BUILD)/speaker.o \
+          $(BUILD)/ata.o $(BUILD)/fs.o $(BUILD)/math.o \
+          $(BUILD)/basic.o $(BUILD)/basic_vars.o $(BUILD)/basic_token.o \
+          $(BUILD)/basic_expr.o $(BUILD)/basic_exec.o
 OBJS    = $(COMMON) $(BUILD)/vga.o
 OBJS_FB = $(COMMON) $(BUILD)/fbconsole.o
 KERNEL  = icarus.bin
@@ -19,7 +21,7 @@ KERNEL_FB = icarus-fb.bin
 ISO     = icarus.iso
 
 # Source files that affect UEFI builds
-SRCS    = $(wildcard *.c *.h *.asm)
+SRCS    = $(wildcard *.c *.h *.asm os/*.c os/*.h lib/*.c lib/*.h basic/*.c basic/*.h boot/*.c boot/*.h)
 
 .PHONY: all clean run iso sim sim-fb sim-uefi sim-uefi64 docker-iso
 
@@ -30,6 +32,18 @@ $(BUILD):
 
 $(BUILD)/boot.o: boot.asm | $(BUILD)
 	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD)/%.o: os/%.c | $(BUILD)
+	$(CC) -c $(CFLAGS) $< -o $@
+
+$(BUILD)/%.o: lib/%.c | $(BUILD)
+	$(CC) -c $(CFLAGS) $< -o $@
+
+$(BUILD)/%.o: basic/%.c | $(BUILD)
+	$(CC) -c $(CFLAGS) $< -o $@
+
+$(BUILD)/%.o: boot/%.c | $(BUILD)
+	$(CC) -c $(CFLAGS) $< -o $@
 
 $(BUILD)/%.o: %.c | $(BUILD)
 	$(CC) -c $(CFLAGS) $< -o $@

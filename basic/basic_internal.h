@@ -3,7 +3,6 @@
 
 #include "basic.h"
 #include "os.h"
-#include "klib.h"
 
 /* ---- Constants ---- */
 

@@ -7,4 +7,5 @@
 build/
 build-efi/
 build-efi64/
-isodir/
+.claude/
+.vscode/
