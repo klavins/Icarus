@@ -30,6 +30,7 @@ enum token_type {
     TOK_RUN,
     TOK_LIST,
     TOK_CLR,
+    TOK_CLS,
     TOK_QUIT,
     TOK_SAVE,
     TOK_LOAD,

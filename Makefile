@@ -11,7 +11,7 @@ COMMON  = $(BUILD)/boot.o $(BUILD)/klib.o $(BUILD)/boot_info.o \
           $(BUILD)/kernel.o \
           $(BUILD)/os.o $(BUILD)/graphics.o \
           $(BUILD)/keyboard.o $(BUILD)/interrupts.o $(BUILD)/speaker.o \
-          $(BUILD)/ata.o $(BUILD)/fs.o $(BUILD)/math.o \
+          $(BUILD)/pci.o $(BUILD)/ahci.o $(BUILD)/ata.o $(BUILD)/fs.o $(BUILD)/math.o \
           $(BUILD)/basic.o $(BUILD)/basic_vars.o $(BUILD)/basic_token.o \
           $(BUILD)/basic_expr.o $(BUILD)/basic_exec.o
 OBJS    = $(COMMON) $(BUILD)/vga.o
@@ -95,7 +95,8 @@ sim-uefi64: icarus-uefi64.img
 		-drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-x86_64-code.fd \
 		-drive if=pflash,format=raw,file=/tmp/ovmf-vars.fd \
 		-drive format=raw,file=icarus-uefi64.img,if=none,id=boot -device ide-hd,drive=boot,bus=ide.1 \
-		-drive file=disk.img,format=raw,if=none,id=data -device ide-hd,drive=data,bus=ide.0 \
+		-device ahci,id=ahci0 \
+		-drive file=disk.img,format=raw,if=none,id=data -device ide-hd,drive=data,bus=ahci0.0 \
 		-m 256 -smp 1 -net none \
 		-display cocoa,zoom-to-fit=on -full-screen \
 		-machine pcspk-audiodev=snd \

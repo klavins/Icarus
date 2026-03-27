@@ -342,6 +342,12 @@ Clear the stored program, all variables, and free all dynamically allocated memo
 
     CLR
 
+### CLS
+
+Clear the screen and move the cursor to the top-left corner. Works in both text mode and from within programs.
+
+    CLS
+
 ### QUIT
 
 Shut down the system (closes QEMU).

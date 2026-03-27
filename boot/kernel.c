@@ -97,7 +97,6 @@ static void print_uefi_info(void) {
                         info->total_memory_kb / 1024);
     }
     print_cpu_info();
-    print_disk_info();
 }
 
 void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
@@ -112,6 +111,8 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
     graphics_alloc_init();
     basic_alloc_set_watermark();
 
+    ata_init();
+    print_disk_info();
     fs_init();
     interrupts_init();
     basic_init();

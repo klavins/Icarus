@@ -5,6 +5,7 @@
 
 int running;
 int next_line_idx;
+int current_linenum;
 
 /* ---- FOR/NEXT stack ---- */
 
@@ -113,6 +114,13 @@ int read_line(char *buf, int max) {
     return pos;
 }
 
+static void syntax_error(void) {
+    if (current_linenum > 0)
+        os_printf("?SYNTAX ERROR IN LINE %d\n", current_linenum);
+    else
+        syntax_error();
+}
+
 /* ---- Statement dispatcher ---- */
 
 void exec_tokens(struct token *t) {
@@ -151,7 +159,7 @@ void exec_tokens(struct token *t) {
                 int size = parse_int();
                 strvar_dim(name, size);
             } else {
-                os_print("?SYNTAX ERROR\n");
+                syntax_error();
             }
         } else if (t->type == TOK_IDENT) {
             const char *name = t->string_val;
@@ -169,10 +177,10 @@ void exec_tokens(struct token *t) {
                     tok_pos++;
                 array_dim(name, s1, s2);
             } else {
-                os_print("?SYNTAX ERROR\n");
+                syntax_error();
             }
         } else {
-            os_print("?SYNTAX ERROR\n");
+            syntax_error();
         }
         break;
 
@@ -200,7 +208,7 @@ void exec_tokens(struct token *t) {
             if (tok_pos->type == TOK_RPAREN)
                 tok_pos++;
             if (tok_pos->type != TOK_EQUAL) {
-                os_print("?SYNTAX ERROR\n");
+                syntax_error();
                 return;
             }
             tok_pos++;
@@ -212,7 +220,7 @@ void exec_tokens(struct token *t) {
             double val = parse_expr();
             var_set(name, val);
         } else {
-            os_print("?SYNTAX ERROR\n");
+            syntax_error();
         }
         break;
 
@@ -226,7 +234,7 @@ void exec_tokens(struct token *t) {
                 if (cond != 0.0)
                     exec_tokens(tok_pos);
             } else {
-                os_print("?SYNTAX ERROR: MISSING THEN\n");
+                syntax_error();
             }
         }
         break;
@@ -234,21 +242,21 @@ void exec_tokens(struct token *t) {
     case TOK_FOR:
         t++;
         if (t->type != TOK_IDENT) {
-            os_print("?SYNTAX ERROR\n");
+            syntax_error();
             return;
         }
         {
             const char *var = t->string_val;
             t++;
             if (t->type != TOK_EQUAL) {
-                os_print("?SYNTAX ERROR\n");
+                syntax_error();
                 return;
             }
             t++;
             tok_pos = t;
             double start = parse_expr();
             if (tok_pos->type != TOK_TO) {
-                os_print("?SYNTAX ERROR: MISSING TO\n");
+                syntax_error();
                 return;
             }
             tok_pos++;
@@ -337,7 +345,7 @@ void exec_tokens(struct token *t) {
             int is_gosub;
             if (tok_pos->type == TOK_GOTO) is_gosub = 0;
             else if (tok_pos->type == TOK_GOSUB) is_gosub = 1;
-            else { os_print("?SYNTAX ERROR: EXPECTED GOTO OR GOSUB\n"); return; }
+            else { syntax_error(); return; }
             tok_pos++;
             int n = 0, target = -1;
             while (tok_pos->type != TOK_EOL) {
@@ -361,6 +369,10 @@ void exec_tokens(struct token *t) {
         break;
 
     case TOK_REM:
+        break;
+
+    case TOK_CLS:
+        os_clear_screen();
         break;
 
     case TOK_POKE:
@@ -417,7 +429,7 @@ void exec_tokens(struct token *t) {
                 data_ptr++;
                 t++;
             } else {
-                os_print("?SYNTAX ERROR\n");
+                syntax_error();
                 return;
             }
             if (t->type == TOK_COMMA) t++;
@@ -492,7 +504,7 @@ void exec_tokens(struct token *t) {
             read_line(buf, 32);
             var_set(name, parse_number_string(buf));
         } else {
-            os_print("?SYNTAX ERROR\n");
+            syntax_error();
         }
         break;
 
@@ -523,7 +535,7 @@ void exec_tokens(struct token *t) {
         break;
 
     default:
-        os_print("?SYNTAX ERROR\n");
+        syntax_error();
         break;
     }
 }
@@ -533,6 +545,7 @@ void run_program(void) {
     for_depth = 0;
     gosub_depth = 0;
     next_line_idx = 0;
+    current_linenum = 0;
     collect_data();
 
     while (running && next_line_idx < program_count) {
@@ -546,6 +559,7 @@ void run_program(void) {
 
         int idx = next_line_idx;
         next_line_idx = idx + 1;
+        current_linenum = program[idx].linenum;
 
         struct token tokens[MAX_TOKENS];
         if (basic_tokenize(program[idx].text, tokens, MAX_TOKENS) < 0) {

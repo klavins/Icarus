@@ -36,6 +36,7 @@ extern int expr_overflow;
 
 extern int running;
 extern int next_line_idx;
+extern int current_linenum;  /* line number of currently executing line, 0 if immediate */
 
 struct for_entry {
     char var[MAX_VAR_NAME];
