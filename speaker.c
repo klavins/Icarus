@@ -24,13 +24,3 @@ void speaker_off(void) {
     uint8_t val = inb(SYS_CTRL);
     outb(SYS_CTRL, val & ~SPK_ENABLE);
 }
-
-void speaker_click(void) {
-    /* Brief pop — toggle speaker manually without PIT */
-    uint8_t val = inb(SYS_CTRL);
-    outb(SYS_CTRL, (val & ~SPK_GATE) | SPK_DATA);  /* speaker on, PIT gate off */
-    /* Short pulse */
-    for (volatile int i = 0; i < 1000; i++)
-        ;
-    outb(SYS_CTRL, val & ~SPK_ENABLE);
-}

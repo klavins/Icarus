@@ -285,12 +285,6 @@ Example — real-time key checking in a game loop:
     120 IF PEEK(458782) = 1 THEN LET X = X - 1
     130 IF PEEK(458784) = 1 THEN LET X = X + 1
 
-### PRESENT
-
-Manually flush the shadow buffer to the display. Normally called automatically by DELAY and PAUSE. Only needed for manual frame control.
-
-    PRESENT
-
 ## Program Management
 
 ### Line Numbers

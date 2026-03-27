@@ -24,7 +24,7 @@ CFLAGS="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -
 echo "==> Compiling..."
 mkdir -p build-efi
 
-for f in uefi_boot.c uefi_stubs.c fbconsole.c klib.c boot_info.c keyboard.c speaker.c ata.c fs.c graphics.c basic.c kernel.c; do
+for f in uefi_boot.c uefi_stubs.c fbconsole.c klib.c boot_info.c keyboard.c speaker.c ata.c fs.c graphics.c basic_vars.c basic_token.c basic_expr.c basic_exec.c basic.c kernel.c; do
     echo "    $f"
     $CC -c $CFLAGS "$f" -o "build-efi/${f%.c}.o"
 done
@@ -43,6 +43,10 @@ ld -m elf_i386 -nostdlib -znocombreloc -T /usr/lib32/elf_ia32_efi.lds -shared \
     build-efi/ata.o \
     build-efi/fs.o \
     build-efi/graphics.o \
+    build-efi/basic_vars.o \
+    build-efi/basic_token.o \
+    build-efi/basic_expr.o \
+    build-efi/basic_exec.o \
     build-efi/basic.o \
     build-efi/kernel.o \
     -L /usr/lib32 -lefi -lgnuefi \

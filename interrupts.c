@@ -249,14 +249,6 @@ void sysinfo_init(void) {
     keybuf_tail = 0;
 }
 
-char keybuf_read(void) {
-    if (keybuf_head == keybuf_tail)
-        return 0;
-    char c = keybuf[keybuf_tail];
-    keybuf_tail = (keybuf_tail + 1) % KEYBUF_SIZE;
-    return c;
-}
-
 char keybuf_read_blocking(void) {
     while (keybuf_head == keybuf_tail)
         asm volatile ("hlt"); /* sleep until next interrupt */
