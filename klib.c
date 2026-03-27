@@ -97,8 +97,150 @@ char *itoa(int value, char *buf, int base) {
     return utoa((unsigned int)value, buf, base);
 }
 
+/* ---- dtoa ---- */
+/* Simple double-to-string. Handles integers without decimal point,
+   and floats with up to 6 significant decimal digits. */
+
+static char *dtoa(double val, char *buf) {
+    char *p = buf;
+
+    /* Handle negative */
+    if (val < 0) {
+        *p++ = '-';
+        val = -val;
+    }
+
+    /* Handle zero */
+    if (val == 0.0) {
+        *p++ = '0';
+        *p = '\0';
+        return buf;
+    }
+
+    /* If it's a whole number and fits in an int, use integer formatting */
+    if (val == (double)(long long)(val) && val < 1e15 && val > -1e15) {
+        long long iv = (long long)val;
+        /* Write digits in reverse */
+        char tmp[24];
+        int i = 0;
+        while (iv > 0) {
+            tmp[i++] = '0' + (int)(iv % 10);
+            iv /= 10;
+        }
+        if (i == 0) tmp[i++] = '0';
+        while (i > 0)
+            *p++ = tmp[--i];
+        *p = '\0';
+        return buf;
+    }
+
+    /* General float formatting */
+    /* Normalize to get integer + fractional parts */
+    int exp = 0;
+    double norm = val;
+
+    /* Scale to range [1, 10) */
+    if (norm >= 10.0) {
+        while (norm >= 10.0) { norm /= 10.0; exp++; }
+    } else if (norm < 1.0) {
+        while (norm < 1.0) { norm *= 10.0; exp--; }
+    }
+
+    /* If exponent is small, use fixed notation */
+    if (exp >= -4 && exp <= 9) {
+        /* Fixed notation */
+        double frac;
+
+        if (exp >= 0) {
+            /* Shift decimal point right */
+            double scale = 1.0;
+            for (int i = 0; i < exp; i++) scale *= 10.0;
+            long long ipart = (long long)(val);
+            frac = val - (double)ipart;
+
+            /* Integer part */
+            char tmp[24];
+            int ti = 0;
+            if (ipart == 0) {
+                tmp[ti++] = '0';
+            } else {
+                while (ipart > 0) {
+                    tmp[ti++] = '0' + (int)(ipart % 10);
+                    ipart /= 10;
+                }
+            }
+            while (ti > 0)
+                *p++ = tmp[--ti];
+        } else {
+            /* Number like 0.00123 */
+            *p++ = '0';
+            frac = val;
+        }
+
+        /* Fractional part — up to 6 digits, trim trailing zeros */
+        if (frac > 0.0000005) {
+            *p++ = '.';
+            char fdigits[7];
+            int fd = 0;
+            for (int i = 0; i < 6; i++) {
+                frac *= 10.0;
+                int d = (int)frac;
+                if (d > 9) d = 9;
+                fdigits[fd++] = '0' + d;
+                frac -= d;
+            }
+            /* Trim trailing zeros */
+            while (fd > 0 && fdigits[fd-1] == '0') fd--;
+            for (int i = 0; i < fd; i++)
+                *p++ = fdigits[i];
+        }
+    } else {
+        /* Scientific notation: d.dddddEsdd */
+        int d = (int)norm;
+        if (d > 9) d = 9;
+        *p++ = '0' + d;
+        double frac = norm - d;
+
+        if (frac > 0.0000005) {
+            *p++ = '.';
+            char fdigits[7];
+            int fd = 0;
+            for (int i = 0; i < 6; i++) {
+                frac *= 10.0;
+                int di = (int)frac;
+                if (di > 9) di = 9;
+                fdigits[fd++] = '0' + di;
+                frac -= di;
+            }
+            while (fd > 0 && fdigits[fd-1] == '0') fd--;
+            for (int i = 0; i < fd; i++)
+                *p++ = fdigits[i];
+        }
+
+        *p++ = 'E';
+        if (exp < 0) {
+            *p++ = '-';
+            exp = -exp;
+        } else {
+            *p++ = '+';
+        }
+        if (exp >= 100) {
+            *p++ = '0' + exp / 100;
+            exp %= 100;
+        }
+        if (exp >= 10) {
+            *p++ = '0' + exp / 10;
+            exp %= 10;
+        }
+        *p++ = '0' + exp;
+    }
+
+    *p = '\0';
+    return buf;
+}
+
 /* ---- sprintf ---- */
-/* Supports: %d %u %x %c %s %% */
+/* Supports: %d %u %x %c %s %g %% */
 
 int vsprintf(char *buf, const char *fmt, va_list args) {
     char *out = buf;
@@ -142,6 +284,13 @@ int vsprintf(char *buf, const char *fmt, va_list args) {
             const char *s = va_arg(args, const char *);
             if (!s) s = "(null)";
             while (*s)
+                *out++ = *s++;
+            break;
+        }
+        case 'g': {
+            double val = va_arg(args, double);
+            dtoa(val, tmp);
+            for (char *s = tmp; *s; )
                 *out++ = *s++;
             break;
         }

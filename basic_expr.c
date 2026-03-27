@@ -1,52 +1,16 @@
 #include "basic_internal.h"
-#include <limits.h>
+#include "math.h"
 
 /* ---- Expression evaluator ---- */
 
 struct token *tok_pos;
 int expr_overflow;  /* set to 1 on overflow, checked by executor */
 
-static int checked_add(int a, int b) {
-    if ((b > 0 && a > INT_MAX - b) || (b < 0 && a < INT_MIN - b)) {
-        expr_overflow = 1;
-        return 0;
-    }
-    return a + b;
-}
-
-static int checked_sub(int a, int b) {
-    if ((b < 0 && a > INT_MAX + b) || (b > 0 && a < INT_MIN + b)) {
-        expr_overflow = 1;
-        return 0;
-    }
-    return a - b;
-}
-
-static int checked_mul(int a, int b) {
-    if (a == 0 || b == 0) return 0;
-    if ((a > 0 && b > 0 && a > INT_MAX / b) ||
-        (a < 0 && b < 0 && a < INT_MAX / b) ||
-        (a > 0 && b < 0 && b < INT_MIN / a) ||
-        (a < 0 && b > 0 && a < INT_MIN / b)) {
-        expr_overflow = 1;
-        return 0;
-    }
-    return a * b;
-}
-
-static int checked_neg(int a) {
-    if (a == INT_MIN) {
-        expr_overflow = 1;
-        return 0;
-    }
-    return -a;
-}
-
 /* Simple linear congruential PRNG -- seeded from PIT timer on first call */
 static uint32_t rng_state;
 static int rng_seeded;
 
-static int basic_rnd(int n) {
+static double basic_rnd(int n) {
     if (!rng_seeded) {
         /* Seed from PIT channel 0 counter -- different each boot */
         outb(0x43, 0x00); /* latch counter 0 */
@@ -56,13 +20,17 @@ static int basic_rnd(int n) {
         rng_seeded = 1;
     }
     rng_state = rng_state * 1103515245 + 12345;
-    if (n <= 0) return 0;
-    return (int)((rng_state >> 16) % (uint32_t)n);
+    if (n > 1) {
+        /* Return integer 0 to n-1 for compatibility with RND(100) etc. */
+        return (double)((int)((rng_state >> 16) % (uint32_t)n));
+    }
+    /* Return 0.0 to ~1.0 */
+    return (double)((rng_state >> 16) & 0x7FFF) / 32768.0;
 }
 
-static int parse_factor(void) {
+static double parse_factor(void) {
     if (tok_pos->type == TOK_NUMBER) {
-        int val = tok_pos->number_val;
+        double val = tok_pos->number_val;
         tok_pos++;
         return val;
     }
@@ -70,29 +38,56 @@ static int parse_factor(void) {
         const char *name = tok_pos->string_val;
         tok_pos++;
 
-        /* Built-in values */
-        if (strcmp(name, "SCRW") == 0) return gfx_width();
-        if (strcmp(name, "SCRH") == 0) return gfx_height();
+        /* Built-in values (no parentheses) */
+        if (strcmp(name, "SCRW") == 0) return (double)gfx_width();
+        if (strcmp(name, "SCRH") == 0) return (double)gfx_height();
+        if (strcmp(name, "PI") == 0) return 3.14159265358979323846;
+        if (strcmp(name, "RND") == 0 && tok_pos->type != TOK_LPAREN)
+            return basic_rnd(0); /* RND without parens = 0.0-1.0 */
 
-        /* Built-in functions */
+        /* Built-in functions (with parentheses) */
         if (tok_pos->type == TOK_LPAREN) {
             if (strcmp(name, "RND") == 0) {
                 tok_pos++;
-                int n = parse_expr();
+                double n = parse_expr();
                 if (tok_pos->type == TOK_RPAREN) tok_pos++;
-                return basic_rnd(n);
+                return basic_rnd((int)n);
             }
             if (strcmp(name, "ABS") == 0) {
                 tok_pos++;
-                int n = parse_expr();
+                double n = parse_expr();
                 if (tok_pos->type == TOK_RPAREN) tok_pos++;
                 return n < 0 ? -n : n;
             }
             if (strcmp(name, "PEEK") == 0) {
                 tok_pos++;
-                int addr = parse_expr();
+                double addr = parse_expr();
                 if (tok_pos->type == TOK_RPAREN) tok_pos++;
-                return *((volatile uint8_t *)(uintptr_t)addr);
+                return (double)*((volatile uint8_t *)(uintptr_t)(int)addr);
+            }
+            if (strcmp(name, "SIN") == 0) {
+                tok_pos++;
+                double n = parse_expr();
+                if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                return ksin(n);
+            }
+            if (strcmp(name, "COS") == 0) {
+                tok_pos++;
+                double n = parse_expr();
+                if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                return kcos(n);
+            }
+            if (strcmp(name, "SQR") == 0) {
+                tok_pos++;
+                double n = parse_expr();
+                if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                return ksqrt(n);
+            }
+            if (strcmp(name, "INT") == 0) {
+                tok_pos++;
+                double n = parse_expr();
+                if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                return (double)(long long)n;
             }
             if (strcmp(name, "LEN") == 0) {
                 tok_pos++;
@@ -100,25 +95,25 @@ static int parse_factor(void) {
                     int len = strlen(strvar_get(tok_pos->string_val));
                     tok_pos++;
                     if (tok_pos->type == TOK_RPAREN) tok_pos++;
-                    return len;
+                    return (double)len;
                 }
                 if (tok_pos->type == TOK_STRING) {
                     int len = strlen(tok_pos->string_val);
                     tok_pos++;
                     if (tok_pos->type == TOK_RPAREN) tok_pos++;
-                    return len;
+                    return (double)len;
                 }
                 if (tok_pos->type == TOK_RPAREN) tok_pos++;
-                return 0;
+                return 0.0;
             }
 
             /* Array access: A(expr) or A(expr, expr) */
             tok_pos++;
-            int i1 = parse_expr();
+            int i1 = (int)parse_expr();
             int i2 = 0;
             if (tok_pos->type == TOK_COMMA) {
                 tok_pos++;
-                i2 = parse_expr();
+                i2 = (int)parse_expr();
             }
             if (tok_pos->type == TOK_RPAREN)
                 tok_pos++;
@@ -128,48 +123,48 @@ static int parse_factor(void) {
     }
     if (tok_pos->type == TOK_LPAREN) {
         tok_pos++;
-        int val = parse_expr();
+        double val = parse_expr();
         if (tok_pos->type == TOK_RPAREN)
             tok_pos++;
         return val;
     }
     if (tok_pos->type == TOK_MINUS) {
         tok_pos++;
-        return checked_neg(parse_factor());
+        return -parse_factor();
     }
-    return 0;
+    return 0.0;
 }
 
-static int parse_term(void) {
-    int val = parse_factor();
+static double parse_term(void) {
+    double val = parse_factor();
     while (tok_pos->type == TOK_STAR || tok_pos->type == TOK_SLASH) {
         enum token_type op = tok_pos->type;
         tok_pos++;
-        int right = parse_factor();
+        double right = parse_factor();
         if (op == TOK_STAR)
-            val = checked_mul(val, right);
-        else if (right != 0)
-            val /= right;
+            val = val * right;
+        else if (right != 0.0)
+            val = val / right;
         else {
             terminal_print("?DIVISION BY ZERO\n");
             expr_overflow = 1;
-            return 0;
+            return 0.0;
         }
     }
     return val;
 }
 
-int parse_expr(void) {
+double parse_expr(void) {
     expr_overflow = 0;
-    int val = parse_term();
+    double val = parse_term();
     while (tok_pos->type == TOK_PLUS || tok_pos->type == TOK_MINUS) {
         enum token_type op = tok_pos->type;
         tok_pos++;
-        int right = parse_term();
+        double right = parse_term();
         if (op == TOK_PLUS)
-            val = checked_add(val, right);
+            val = val + right;
         else
-            val = checked_sub(val, right);
+            val = val - right;
     }
     return val;
 }
@@ -179,20 +174,20 @@ static int is_comparison(enum token_type t) {
            t == TOK_LE || t == TOK_GE || t == TOK_NE;
 }
 
-int parse_condition(void) {
-    int left = parse_expr();
+double parse_condition(void) {
+    double left = parse_expr();
     if (!is_comparison(tok_pos->type))
         return left;
     enum token_type op = tok_pos->type;
     tok_pos++;
-    int right = parse_expr();
+    double right = parse_expr();
     switch (op) {
-    case TOK_EQUAL: return left == right;
-    case TOK_LT:    return left < right;
-    case TOK_GT:    return left > right;
-    case TOK_LE:    return left <= right;
-    case TOK_GE:    return left >= right;
-    case TOK_NE:    return left != right;
-    default:        return 0;
+    case TOK_EQUAL: return left == right ? 1.0 : 0.0;
+    case TOK_LT:    return left < right ? 1.0 : 0.0;
+    case TOK_GT:    return left > right ? 1.0 : 0.0;
+    case TOK_LE:    return left <= right ? 1.0 : 0.0;
+    case TOK_GE:    return left >= right ? 1.0 : 0.0;
+    case TOK_NE:    return left != right ? 1.0 : 0.0;
+    default:        return 0.0;
     }
 }

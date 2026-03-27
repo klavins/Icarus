@@ -197,15 +197,33 @@ eoi:
 #ifdef __x86_64__
 
 
-/* Minimal ISR: just save/restore all GPRs, no segment manipulation */
+/* ISR: save/restore all GPRs + SSE state */
 #define ISR_SAVE \
     "cld\n" \
     "push %rax\n push %rbx\n push %rcx\n push %rdx\n" \
     "push %rbp\n push %rsi\n push %rdi\n" \
     "push %r8\n push %r9\n push %r10\n push %r11\n" \
-    "push %r12\n push %r13\n push %r14\n push %r15\n"
+    "push %r12\n push %r13\n push %r14\n push %r15\n" \
+    "sub $256, %rsp\n" \
+    "movdqu %xmm0,  0x00(%rsp)\n movdqu %xmm1,  0x10(%rsp)\n" \
+    "movdqu %xmm2,  0x20(%rsp)\n movdqu %xmm3,  0x30(%rsp)\n" \
+    "movdqu %xmm4,  0x40(%rsp)\n movdqu %xmm5,  0x50(%rsp)\n" \
+    "movdqu %xmm6,  0x60(%rsp)\n movdqu %xmm7,  0x70(%rsp)\n" \
+    "movdqu %xmm8,  0x80(%rsp)\n movdqu %xmm9,  0x90(%rsp)\n" \
+    "movdqu %xmm10, 0xA0(%rsp)\n movdqu %xmm11, 0xB0(%rsp)\n" \
+    "movdqu %xmm12, 0xC0(%rsp)\n movdqu %xmm13, 0xD0(%rsp)\n" \
+    "movdqu %xmm14, 0xE0(%rsp)\n movdqu %xmm15, 0xF0(%rsp)\n"
 
 #define ISR_RESTORE \
+    "movdqu 0x00(%rsp), %xmm0\n  movdqu 0x10(%rsp), %xmm1\n" \
+    "movdqu 0x20(%rsp), %xmm2\n  movdqu 0x30(%rsp), %xmm3\n" \
+    "movdqu 0x40(%rsp), %xmm4\n  movdqu 0x50(%rsp), %xmm5\n" \
+    "movdqu 0x60(%rsp), %xmm6\n  movdqu 0x70(%rsp), %xmm7\n" \
+    "movdqu 0x80(%rsp), %xmm8\n  movdqu 0x90(%rsp), %xmm9\n" \
+    "movdqu 0xA0(%rsp), %xmm10\n movdqu 0xB0(%rsp), %xmm11\n" \
+    "movdqu 0xC0(%rsp), %xmm12\n movdqu 0xD0(%rsp), %xmm13\n" \
+    "movdqu 0xE0(%rsp), %xmm14\n movdqu 0xF0(%rsp), %xmm15\n" \
+    "add $256, %rsp\n" \
     "pop %r15\n pop %r14\n pop %r13\n pop %r12\n" \
     "pop %r11\n pop %r10\n pop %r9\n pop %r8\n" \
     "pop %rdi\n pop %rsi\n pop %rbp\n" \

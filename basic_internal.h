@@ -48,8 +48,8 @@ extern int next_line_idx;
 
 struct for_entry {
     char var[MAX_VAR_NAME];
-    int limit;
-    int step;
+    double limit;
+    double step;
     int program_idx;
 };
 
@@ -61,7 +61,7 @@ extern int gosub_depth;
 
 struct data_item {
     int is_string;
-    int number_val;
+    double number_val;
     char string_val[MAX_TOKEN_LEN];
 };
 
@@ -78,16 +78,16 @@ extern int array_count;
 /* ---- Variable functions (basic_vars.c) ---- */
 
 int         var_find(const char *name);
-int         var_get(const char *name);
-void        var_set(const char *name, int val);
+double      var_get(const char *name);
+void        var_set(const char *name, double val);
 int         strvar_find(const char *name);
 const char *strvar_get(const char *name);
 void        strvar_set(const char *name, const char *val);
 void        strvar_dim(const char *name, int size);
 int         array_find(const char *name);
 void        array_dim(const char *name, int s1, int s2);
-int         array_get(const char *name, int i1, int i2);
-void        array_set(const char *name, int i1, int i2, int val);
+double      array_get(const char *name, int i1, int i2);
+void        array_set(const char *name, int i1, int i2, double val);
 
 /* ---- Tokenizer helpers (basic_token.c) ---- */
 
@@ -98,8 +98,8 @@ char to_upper(char c);
 
 /* ---- Expression evaluator (basic_expr.c) ---- */
 
-int parse_expr(void);
-int parse_condition(void);
+double parse_expr(void);
+double parse_condition(void);
 
 /* ---- Executor (basic_exec.c) ---- */
 

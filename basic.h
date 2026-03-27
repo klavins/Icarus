@@ -70,7 +70,7 @@ enum token_type {
 
 struct token {
     enum token_type type;
-    int number_val;
+    double number_val;
     char string_val[MAX_TOKEN_LEN];
 };
 

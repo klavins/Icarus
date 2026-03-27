@@ -274,7 +274,7 @@ void basic_exec(const char *line) {
 
     /* If the line starts with a number, store it as a program line */
     if (tokens[0].type == TOK_NUMBER) {
-        int linenum = tokens[0].number_val;
+        int linenum = (int)tokens[0].number_val;
         /* Find where the line number ends in the input */
         const char *p = line;
         while (*p == ' ') p++;

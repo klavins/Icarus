@@ -4,7 +4,7 @@
 
 static struct {
     char name[MAX_VAR_NAME];
-    int  val;
+    double val;
 } num_vars[MAX_VARS];
 int num_var_count;
 
@@ -15,13 +15,13 @@ int var_find(const char *name) {
     return -1;
 }
 
-int var_get(const char *name) {
+double var_get(const char *name) {
     int i = var_find(name);
     if (i >= 0) return num_vars[i].val;
-    return 0;
+    return 0.0;
 }
 
-void var_set(const char *name, int val) {
+void var_set(const char *name, double val) {
     int i = var_find(name);
     if (i >= 0) {
         num_vars[i].val = val;
@@ -101,7 +101,7 @@ static struct {
     int  dimmed;
     int  size1;
     int  size2;
-    int  vals[MAX_ARRAY_SIZE];
+    double vals[MAX_ARRAY_SIZE];
 } arrays[MAX_VARS];
 int array_count;
 
@@ -133,33 +133,33 @@ void array_dim(const char *name, int s1, int s2) {
     arrays[i].dimmed = 1;
     arrays[i].size1 = s1;
     arrays[i].size2 = s2;
-    memset(arrays[i].vals, 0, total * sizeof(int));
+    memset(arrays[i].vals, 0, total * sizeof(double));
 }
 
-int array_get(const char *name, int i1, int i2) {
+double array_get(const char *name, int i1, int i2) {
     int a = array_find(name);
     if (a < 0 || !arrays[a].dimmed) {
         terminal_print("?ARRAY NOT DIMMED\n");
-        return 0;
+        return 0.0;
     }
     int idx;
     if (arrays[a].size2 > 0) {
         if (i1 < 0 || i1 >= arrays[a].size1 || i2 < 0 || i2 >= arrays[a].size2) {
             terminal_print("?BAD SUBSCRIPT\n");
-            return 0;
+            return 0.0;
         }
         idx = i1 * arrays[a].size2 + i2;
     } else {
         if (i1 < 0 || i1 >= arrays[a].size1) {
             terminal_print("?BAD SUBSCRIPT\n");
-            return 0;
+            return 0.0;
         }
         idx = i1;
     }
     return arrays[a].vals[idx];
 }
 
-void array_set(const char *name, int i1, int i2, int val) {
+void array_set(const char *name, int i1, int i2, double val) {
     int a = array_find(name);
     if (a < 0 || !arrays[a].dimmed) {
         terminal_print("?ARRAY NOT DIMMED\n");

@@ -83,8 +83,8 @@ void exec_tokens(struct token *t) {
                 terminal_print(strvar_get(tok_pos->string_val));
                 tok_pos++;
             } else {
-                int val = parse_expr();
-                terminal_printf("%d", val);
+                double val = parse_expr();
+                terminal_printf("%g", val);
             }
             if (tok_pos->type == TOK_COMMA)
                 tok_pos++;
@@ -99,7 +99,7 @@ void exec_tokens(struct token *t) {
             if (t->type == TOK_LPAREN) {
                 t++;
                 tok_pos = t;
-                int size = parse_expr();
+                int size = (int)parse_expr();
                 strvar_dim(name, size);
             } else {
                 terminal_print("?SYNTAX ERROR\n");
@@ -110,11 +110,11 @@ void exec_tokens(struct token *t) {
             if (t->type == TOK_LPAREN) {
                 t++;
                 tok_pos = t;
-                int s1 = parse_expr();
+                int s1 = (int)parse_expr();
                 int s2 = 0;
                 if (tok_pos->type == TOK_COMMA) {
                     tok_pos++;
-                    s2 = parse_expr();
+                    s2 = (int)parse_expr();
                 }
                 if (tok_pos->type == TOK_RPAREN)
                     tok_pos++;
@@ -142,11 +142,11 @@ void exec_tokens(struct token *t) {
             /* LET A(expr) = expr  or  LET A(expr, expr) = expr */
             const char *name = t->string_val;
             tok_pos = t + 2;
-            int i1 = parse_expr();
+            int i1 = (int)parse_expr();
             int i2 = 0;
             if (tok_pos->type == TOK_COMMA) {
                 tok_pos++;
-                i2 = parse_expr();
+                i2 = (int)parse_expr();
             }
             if (tok_pos->type == TOK_RPAREN)
                 tok_pos++;
@@ -155,12 +155,12 @@ void exec_tokens(struct token *t) {
                 return;
             }
             tok_pos++;
-            int val = parse_expr();
+            double val = parse_expr();
             array_set(name, i1, i2, val);
         } else if (t->type == TOK_IDENT && t[1].type == TOK_EQUAL) {
             const char *name = t->string_val;
             tok_pos = t + 2;
-            int val = parse_expr();
+            double val = parse_expr();
             var_set(name, val);
         } else {
             terminal_print("?SYNTAX ERROR\n");
@@ -168,10 +168,10 @@ void exec_tokens(struct token *t) {
     } else if (t->type == TOK_IF) {
         t++;
         tok_pos = t;
-        int cond = parse_condition();
+        double cond = parse_condition();
         if (tok_pos->type == TOK_THEN) {
             tok_pos++;
-            if (cond)
+            if (cond != 0.0)
                 exec_tokens(tok_pos);
         } else {
             terminal_print("?SYNTAX ERROR: MISSING THEN\n");
@@ -191,14 +191,14 @@ void exec_tokens(struct token *t) {
         }
         t++;
         tok_pos = t;
-        int start = parse_expr();
+        double start = parse_expr();
         if (tok_pos->type != TOK_TO) {
             terminal_print("?SYNTAX ERROR: MISSING TO\n");
             return;
         }
         tok_pos++;
-        int limit = parse_expr();
-        int step = 1;
+        double limit = parse_expr();
+        double step = 1.0;
         if (tok_pos->type == TOK_STEP) {
             tok_pos++;
             step = parse_expr();
@@ -228,7 +228,7 @@ void exec_tokens(struct token *t) {
             terminal_print("?NEXT WITHOUT FOR\n");
             return;
         }
-        int val = var_get(var) + for_stack[fi].step;
+        double val = var_get(var) + for_stack[fi].step;
         var_set(var, val);
         int done;
         if (for_stack[fi].step > 0)
@@ -245,7 +245,7 @@ void exec_tokens(struct token *t) {
     } else if (t->type == TOK_GOTO) {
         t++;
         tok_pos = t;
-        int target = parse_expr();
+        int target = (int)parse_expr();
         int idx = program_find(target);
         if (idx < 0) {
             terminal_print("?UNDEFINED LINE\n");
@@ -256,7 +256,7 @@ void exec_tokens(struct token *t) {
     } else if (t->type == TOK_GOSUB) {
         t++;
         tok_pos = t;
-        int target = parse_expr();
+        int target = (int)parse_expr();
         int idx = program_find(target);
         if (idx < 0) {
             terminal_print("?UNDEFINED LINE\n");
@@ -281,7 +281,7 @@ void exec_tokens(struct token *t) {
         /* ON expr GOTO/GOSUB line1, line2, line3, ... */
         t++;
         tok_pos = t;
-        int val = parse_expr();
+        int val = (int)parse_expr();
         int is_gosub;
         if (tok_pos->type == TOK_GOTO) {
             is_gosub = 0;
@@ -296,7 +296,7 @@ void exec_tokens(struct token *t) {
         int n = 0;
         int target = -1;
         while (tok_pos->type != TOK_EOL) {
-            int linenum = parse_expr();
+            int linenum = (int)parse_expr();
             n++;
             if (n == val)
                 target = linenum;
@@ -332,15 +332,15 @@ void exec_tokens(struct token *t) {
         /* POKE address, value */
         t++;
         tok_pos = t;
-        int addr = parse_expr();
+        int addr = (int)parse_expr();
         if (tok_pos->type == TOK_COMMA) tok_pos++;
-        int val = parse_expr();
-        *((volatile uint8_t *)(uintptr_t)addr) = (uint8_t)val;
+        int pval = (int)parse_expr();
+        *((volatile uint8_t *)(uintptr_t)addr) = (uint8_t)pval;
     } else if (t->type == TOK_DELAY) {
         /* DELAY n -- wait for n milliseconds (timer runs at 200Hz = 5ms/tick) */
         t++;
         tok_pos = t;
-        int n = parse_expr();
+        int n = (int)parse_expr();
         gfx_present(); /* flush any drawing before waiting */
         volatile uint32_t *ticks = SYS_TICKS_PTR;
         uint32_t wait_ticks = (uint32_t)n / 5;
@@ -368,11 +368,11 @@ void exec_tokens(struct token *t) {
                 }
                 const char *name = t->string_val;
                 tok_pos = t + 2;
-                int i1 = parse_expr();
+                int i1 = (int)parse_expr();
                 int i2 = 0;
                 if (tok_pos->type == TOK_COMMA) {
                     tok_pos++;
-                    i2 = parse_expr();
+                    i2 = (int)parse_expr();
                 }
                 if (tok_pos->type == TOK_RPAREN)
                     tok_pos++;
@@ -409,7 +409,7 @@ void exec_tokens(struct token *t) {
     } else if (t->type == TOK_COLOR) {
         t++;
         tok_pos = t;
-        int val = parse_expr();
+        int val = (int)parse_expr();
         if (gfx_get_mode() >= 1)
             gfx_set_color(val);
         else
@@ -418,14 +418,14 @@ void exec_tokens(struct token *t) {
         /* SOUND voice, pitch, distortion, volume */
         t++;
         tok_pos = t;
-        int voice = parse_expr();
+        int voice = (int)parse_expr();
         if (tok_pos->type == TOK_COMMA) tok_pos++;
-        int pitch = parse_expr();
+        int pitch = (int)parse_expr();
         if (tok_pos->type == TOK_COMMA) tok_pos++;
-        int dist = parse_expr();
+        int dist = (int)parse_expr();
         (void)dist;  /* PC speaker has no distortion control */
         if (tok_pos->type == TOK_COMMA) tok_pos++;
-        int volume = parse_expr();
+        int volume = (int)parse_expr();
         (void)voice; /* only one speaker */
         if (volume == 0) {
             speaker_off();
@@ -437,23 +437,23 @@ void exec_tokens(struct token *t) {
         /* GRAPHICS 0 or GRAPHICS 1 */
         t++;
         tok_pos = t;
-        int mode = parse_expr();
+        int mode = (int)parse_expr();
         gfx_set_mode(mode);
     } else if (t->type == TOK_PLOT) {
         /* PLOT x, y */
         t++;
         tok_pos = t;
-        int x = parse_expr();
+        int x = (int)parse_expr();
         if (tok_pos->type == TOK_COMMA) tok_pos++;
-        int y = parse_expr();
+        int y = (int)parse_expr();
         gfx_plot(x, y);
     } else if (t->type == TOK_DRAWTO) {
         /* DRAWTO x, y */
         t++;
         tok_pos = t;
-        int x = parse_expr();
+        int x = (int)parse_expr();
         if (tok_pos->type == TOK_COMMA) tok_pos++;
-        int y = parse_expr();
+        int y = (int)parse_expr();
         gfx_drawto(x, y);
     } else if (t->type == TOK_INPUT) {
         /* INPUT X  or  INPUT "prompt", X  or  INPUT A$ */
@@ -506,12 +506,20 @@ void exec_tokens(struct token *t) {
             buf[pos] = '\0';
             terminal_putchar('\n');
             /* Parse the number */
-            int val = 0;
+            double val = 0;
             int neg = 0;
             int i = 0;
             if (buf[0] == '-') { neg = 1; i = 1; }
             while (buf[i] >= '0' && buf[i] <= '9')
                 val = val * 10 + (buf[i++] - '0');
+            if (buf[i] == '.') {
+                i++;
+                double frac = 0.1;
+                while (buf[i] >= '0' && buf[i] <= '9') {
+                    val += (buf[i++] - '0') * frac;
+                    frac *= 0.1;
+                }
+            }
             if (neg) val = -val;
             var_set(name, val);
         } else {
@@ -525,9 +533,9 @@ void exec_tokens(struct token *t) {
         /* POS x, y */
         t++;
         tok_pos = t;
-        int x = parse_expr();
+        int x = (int)parse_expr();
         if (tok_pos->type == TOK_COMMA) tok_pos++;
-        int y = parse_expr();
+        int y = (int)parse_expr();
         gfx_pos(x, y);
     } else if (t->type == TOK_TEXT) {
         /* TEXT "string" or TEXT A$ */
@@ -539,9 +547,9 @@ void exec_tokens(struct token *t) {
         } else {
             /* Evaluate as expression and print the number */
             tok_pos = t;
-            int val = parse_expr();
+            double val = parse_expr();
             char buf[32];
-            sprintf(buf, "%d", val);
+            sprintf(buf, "%g", val);
             gfx_text(buf);
         }
     } else {

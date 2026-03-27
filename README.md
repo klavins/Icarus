@@ -183,6 +183,39 @@ LOAD "HELLO"
 RUN
 ```
 
+## Memory Map
+
+When ICARUS boots via UEFI, the 64-bit EFI stub collects hardware information and passes control to the kernel. The following memory regions are used:
+
+```
+Address         Size        Description
+─────────────── ─────────── ────────────────────────────────
+0x00000000      640 KB      Low memory (conventional)
+0x00070000      256 bytes   System status area
+                             +0x000  Key state (128 bytes, 1=pressed per scancode)
+                             +0x080  Last key scancode
+                             +0x081  Last key ASCII
+                             +0x084  Timer tick count (32-bit)
+                             +0x088  Uptime seconds (32-bit)
+0x00080000      92 bytes    UEFI boot info (framebuffer addr, resolution, memory, firmware)
+0x00090000      64 KB       Kernel stack
+0x00100000+     ~19 MB      Kernel code and data (loaded by UEFI)
+                             .text    Code
+                             .rodata  String literals, font data, VGA palette
+                             .data    Initialized globals
+                             .bss     Shadow framebuffer (~9 MB)
+                                      Framebuffer save buffer (~9 MB)
+                                      BASIC variable tables
+                                      BASIC program store
+                                      Interrupt descriptor table
+                                      Global descriptor table
+0xFD000000+     ~4 MB       GOP framebuffer (address varies, provided by UEFI)
+                             1280x800x4 bytes on our test hardware
+                             Written by gfx_present() from shadow buffer
+```
+
+The system status area at `0x70000` is readable from BASIC via `PEEK`. The interrupt handler updates key state and timer ticks here in real time. See `sysinfo.h` for the full layout.
+
 ## Project Structure
 
 ### Kernel

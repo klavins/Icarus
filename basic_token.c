@@ -77,9 +77,32 @@ int basic_tokenize(const char *input, struct token *tokens, int max) {
 
         if (is_digit(*p)) {
             t->type = TOK_NUMBER;
-            int val = 0;
-            while (is_digit(*p))
-                val = val * 10 + (*p++ - '0');
+            double val = 0;
+            if (*p == '0' && (p[1] == 'x' || p[1] == 'X')) {
+                /* Hex literal: 0xFF */
+                p += 2;
+                int ival = 0;
+                while (is_digit(*p) || (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F')) {
+                    int d;
+                    if (*p >= '0' && *p <= '9') d = *p - '0';
+                    else if (*p >= 'a' && *p <= 'f') d = *p - 'a' + 10;
+                    else d = *p - 'A' + 10;
+                    ival = ival * 16 + d;
+                    p++;
+                }
+                val = ival;
+            } else {
+                while (is_digit(*p))
+                    val = val * 10 + (*p++ - '0');
+                if (*p == '.') {
+                    p++;
+                    double frac = 0.1;
+                    while (is_digit(*p)) {
+                        val += (*p++ - '0') * frac;
+                        frac *= 0.1;
+                    }
+                }
+            }
             t->number_val = val;
         } else if (is_alpha(*p)) {
             int i = 0;
