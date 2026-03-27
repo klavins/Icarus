@@ -12,11 +12,8 @@ static int rng_seeded;
 
 static double basic_rnd(int n) {
     if (!rng_seeded) {
-        /* Seed from PIT channel 0 counter -- different each boot */
-        outb(0x43, 0x00); /* latch counter 0 */
-        uint32_t lo = inb(0x40);
-        uint32_t hi = inb(0x40);
-        rng_state = (hi << 8) | lo | 0x10000;
+        /* Seed from system tick counter -- different each boot */
+        rng_state = os_ticks() | 0x10000;
         rng_seeded = 1;
     }
     rng_state = rng_state * 1103515245 + 12345;
@@ -39,8 +36,8 @@ static double parse_factor(void) {
         tok_pos++;
 
         /* Built-in values (no parentheses) */
-        if (strcmp(name, "SCRW") == 0) return (double)gfx_width();
-        if (strcmp(name, "SCRH") == 0) return (double)gfx_height();
+        if (strcmp(name, "SCRW") == 0) return (double)os_screen_width();
+        if (strcmp(name, "SCRH") == 0) return (double)os_screen_height();
         if (strcmp(name, "PI") == 0) return 3.14159265358979323846;
         if (strcmp(name, "RND") == 0 && tok_pos->type != TOK_LPAREN)
             return basic_rnd(0); /* RND without parens = 0.0-1.0 */
@@ -146,7 +143,7 @@ static double parse_term(void) {
         else if (right != 0.0)
             val = val / right;
         else {
-            terminal_print("?DIVISION BY ZERO\n");
+            os_print("?DIVISION BY ZERO\n");
             expr_overflow = 1;
             return 0.0;
         }

@@ -1,5 +1,7 @@
 #include "basic_internal.h"
 
+#define BASIC_FILENAME_LEN 12
+
 /* ---- Program store ---- */
 
 struct program_line program[MAX_LINES];
@@ -19,14 +21,14 @@ static void program_insert(int linenum, const char *text) {
         int len = strlen(text);
         program[idx].text = basic_alloc(len + 1);
         if (!program[idx].text) {
-            terminal_print("?OUT OF MEMORY\n");
+            os_print("?OUT OF MEMORY\n");
             return;
         }
         strcpy(program[idx].text, text);
         return;
     }
     if (program_count >= MAX_LINES) {
-        terminal_print("?PROGRAM FULL\n");
+        os_print("?PROGRAM FULL\n");
         return;
     }
     /* Insert in sorted order */
@@ -38,7 +40,7 @@ static void program_insert(int linenum, const char *text) {
     int len = strlen(text);
     program[i].text = basic_alloc(len + 1);
     if (!program[i].text) {
-        terminal_print("?OUT OF MEMORY\n");
+        os_print("?OUT OF MEMORY\n");
         return;
     }
     program[i].linenum = linenum;
@@ -50,74 +52,74 @@ static void program_insert(int linenum, const char *text) {
 
 static void dos_menu(void) {
     for (;;) {
-        terminal_setcolor(VGA_YELLOW, VGA_BLACK);
-        terminal_print("\n");
-        terminal_print(" ================================\n");
-        terminal_print("  ICARUS DOS\n");
-        terminal_print(" ================================\n");
-        terminal_setcolor(VGA_LCYAN, VGA_BLACK);
-        terminal_print("  D - Directory\n");
-        terminal_print("  L - Load file\n");
-        terminal_print("  S - Save program\n");
-        terminal_print("  E - Erase file\n");
-        terminal_print("  F - Format disk\n");
-        terminal_print("  B - Back to BASIC\n");
-        terminal_print("\n");
-        terminal_print("  Choice: ");
+        os_set_color(OS_YELLOW, OS_BLACK);
+        os_print("\n");
+        os_print(" ================================\n");
+        os_print("  ICARUS DOS\n");
+        os_print(" ================================\n");
+        os_set_color(OS_LCYAN, OS_BLACK);
+        os_print("  D - Directory\n");
+        os_print("  L - Load file\n");
+        os_print("  S - Save program\n");
+        os_print("  E - Erase file\n");
+        os_print("  F - Format disk\n");
+        os_print("  B - Back to BASIC\n");
+        os_print("\n");
+        os_print("  Choice: ");
 
         char c = 0;
-        while (!c) c = keyboard_poll();
-        terminal_putchar(c);
-        terminal_putchar('\n');
+        while (!c) c = os_read_key();
+        os_putchar(c);
+        os_putchar('\n');
 
         if (c == 'b' || c == 'B')
             return;
 
         if (c == 'd' || c == 'D') {
-            terminal_print("\n");
-            fs_list();
+            os_print("\n");
+            os_list_files();
         } else if (c == 'f' || c == 'F') {
-            terminal_print(" Are you sure? (Y/N) ");
+            os_print(" Are you sure? (Y/N) ");
             char yn = 0;
-            while (!yn) yn = keyboard_poll();
-            terminal_putchar(yn);
-            terminal_putchar('\n');
+            while (!yn) yn = os_read_key();
+            os_putchar(yn);
+            os_putchar('\n');
             if (yn == 'y' || yn == 'Y') {
-                if (fs_format() == 0)
-                    terminal_print(" Formatted.\n");
+                if (os_format_disk() == 0)
+                    os_print(" Formatted.\n");
                 else
-                    terminal_print(" ?FORMAT ERROR\n");
+                    os_print(" ?FORMAT ERROR\n");
             }
         } else if (c == 's' || c == 'S') {
-            terminal_print(" Filename: ");
-            char name[FS_NAME_LEN];
-            if (read_line(name, FS_NAME_LEN) > 0) {
+            os_print(" Filename: ");
+            char name[BASIC_FILENAME_LEN];
+            if (read_line(name, BASIC_FILENAME_LEN) > 0) {
                 static char savebuf[16384];
                 int size = basic_program_serialize(savebuf, sizeof(savebuf));
                 if (size > 0) {
-                    if (fs_save(name, savebuf, size) == 0)
-                        terminal_print(" Saved.\n");
+                    if (os_save_file(name, savebuf, size) == 0)
+                        os_print(" Saved.\n");
                 } else {
-                    terminal_print(" ?NO PROGRAM\n");
+                    os_print(" ?NO PROGRAM\n");
                 }
             }
         } else if (c == 'l' || c == 'L') {
-            terminal_print(" Filename: ");
-            char name[FS_NAME_LEN];
-            if (read_line(name, FS_NAME_LEN) > 0) {
+            os_print(" Filename: ");
+            char name[BASIC_FILENAME_LEN];
+            if (read_line(name, BASIC_FILENAME_LEN) > 0) {
                 static char loadbuf[16384];
-                int size = fs_load(name, loadbuf, sizeof(loadbuf));
+                int size = os_load_file(name, loadbuf, sizeof(loadbuf));
                 if (size > 0) {
                     basic_program_deserialize(loadbuf, size);
-                    terminal_print(" Loaded.\n");
+                    os_print(" Loaded.\n");
                 }
             }
         } else if (c == 'e' || c == 'E') {
-            terminal_print(" Filename: ");
-            char name[FS_NAME_LEN];
-            if (read_line(name, FS_NAME_LEN) > 0) {
-                if (fs_delete(name) == 0)
-                    terminal_print(" Deleted.\n");
+            os_print(" Filename: ");
+            char name[BASIC_FILENAME_LEN];
+            if (read_line(name, BASIC_FILENAME_LEN) > 0) {
+                if (os_delete_file(name) == 0)
+                    os_print(" Deleted.\n");
             }
         }
     }
@@ -161,84 +163,79 @@ void basic_exec(const char *line) {
     /* CLR command -- clear program */
     if (tokens[0].type == TOK_CLR) {
         basic_init();
-        terminal_print("OK\n");
+        os_print("OK\n");
         return;
     }
 
     /* QUIT command -- shutdown */
     if (tokens[0].type == TOK_QUIT) {
-        terminal_print("SHUTTING DOWN...\n");
-        /* Try multiple QEMU shutdown methods */
-        outw(0x604, 0x2000);   /* PIIX4 ACPI (BIOS mode) */
-        outw(0xB004, 0x2000);  /* Bochs/old QEMU */
-        outw(0x4004, 0x3400);  /* QEMU Q35/UEFI */
-        /* Halt if none worked */
-        asm volatile ("cli; hlt");
+        os_print("SHUTTING DOWN...\n");
+        os_shutdown();
         return;
     }
 
     /* SAVE "filename" */
     if (tokens[0].type == TOK_SAVE) {
         if (tokens[1].type != TOK_STRING) {
-            terminal_print("?SYNTAX ERROR\n");
+            os_print("?SYNTAX ERROR\n");
             return;
         }
         static char savebuf[16384];
         int size = basic_program_serialize(savebuf, sizeof(savebuf));
         if (size <= 0) {
-            terminal_print("?NO PROGRAM\n");
+            os_print("?NO PROGRAM\n");
             return;
         }
-        if (fs_save(tokens[1].string_val, savebuf, size) == 0)
-            terminal_print("SAVED\n");
+        if (os_save_file(tokens[1].string_val, savebuf, size) == 0)
+            os_print("SAVED\n");
         return;
     }
 
     /* LOAD "filename" */
     if (tokens[0].type == TOK_LOAD) {
         if (tokens[1].type != TOK_STRING) {
-            terminal_print("?SYNTAX ERROR\n");
+            os_print("?SYNTAX ERROR\n");
             return;
         }
         static char loadbuf[16384];
-        int size = fs_load(tokens[1].string_val, loadbuf, sizeof(loadbuf));
+        int size = os_load_file(tokens[1].string_val, loadbuf, sizeof(loadbuf));
         if (size > 0) {
             basic_program_deserialize(loadbuf, size);
-            terminal_print("LOADED\n");
+            os_print("LOADED\n");
         }
         return;
     }
 
     /* DIR */
     if (tokens[0].type == TOK_DIR) {
-        fs_list();
+        os_list_files();
         return;
     }
 
     /* DELETE "filename" */
     if (tokens[0].type == TOK_DELETE) {
         if (tokens[1].type != TOK_STRING) {
-            terminal_print("?SYNTAX ERROR\n");
+            os_print("?SYNTAX ERROR\n");
             return;
         }
-        if (fs_delete(tokens[1].string_val) == 0)
-            terminal_print("DELETED\n");
+        if (os_delete_file(tokens[1].string_val) == 0)
+            os_print("DELETED\n");
         return;
     }
 
     /* FORMAT */
     if (tokens[0].type == TOK_FORMAT) {
-        terminal_print("FORMAT DISK - ARE YOU SURE? (Y/N) ");
+        os_print("FORMAT DISK - ARE YOU SURE? (Y/N) ");
         char c = 0;
         while (c != 'y' && c != 'Y' && c != 'n' && c != 'N')
-            c = keyboard_poll();
-        terminal_putchar(c);
-        terminal_putchar('\n');
+            c = os_read_key();
+        os_putchar(c);
+        os_putchar('\n');
         if (c == 'y' || c == 'Y') {
-            if (fs_format() == 0)
-                terminal_print("FORMATTED\n");
+            if (os_format_disk() == 0)
+                os_print("FORMATTED\n");
             else
-                terminal_print("?FORMAT ERROR\n");
+                os_print("?FORMAT ERROR\n");
         }
         return;
     }

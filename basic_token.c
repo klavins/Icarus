@@ -149,7 +149,7 @@ int basic_tokenize(const char *input, struct token *tokens, int max) {
             case ')': t->type = TOK_RPAREN; break;
             case ',': t->type = TOK_COMMA;  break;
             default:
-                terminal_printf("?ILLEGAL CHARACTER: %c\n", *p);
+                os_printf("?ILLEGAL CHARACTER: %c\n", *p);
                 return -1;
             }
             p++;

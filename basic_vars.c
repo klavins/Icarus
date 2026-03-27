@@ -77,7 +77,7 @@ void var_set(const char *name, double val) {
         return;
     }
     if (num_var_count >= MAX_VARS) {
-        terminal_print("?TOO MANY VARIABLES\n");
+        os_print("?TOO MANY VARIABLES\n");
         return;
     }
     strncpy(num_vars[num_var_count].name, name, MAX_VAR_NAME - 1);
@@ -112,11 +112,11 @@ const char *strvar_get(const char *name) {
 void strvar_set(const char *name, const char *val) {
     int i = strvar_find(name);
     if (i < 0) {
-        terminal_print("?STRING NOT DIMMED\n");
+        os_print("?STRING NOT DIMMED\n");
         return;
     }
     if (!str_vars[i].dimmed || !str_vars[i].val) {
-        terminal_print("?STRING NOT DIMMED\n");
+        os_print("?STRING NOT DIMMED\n");
         return;
     }
     int j;
@@ -129,7 +129,7 @@ void strvar_dim(const char *name, int size) {
     int i = strvar_find(name);
     if (i < 0) {
         if (str_var_count >= MAX_VARS) {
-            terminal_print("?TOO MANY VARIABLES\n");
+            os_print("?TOO MANY VARIABLES\n");
             return;
         }
         i = str_var_count++;
@@ -140,7 +140,7 @@ void strvar_dim(const char *name, int size) {
     if (size > MAX_STR_LEN) size = MAX_STR_LEN;
     str_vars[i].val = basic_alloc(size);
     if (!str_vars[i].val) {
-        terminal_print("?OUT OF MEMORY\n");
+        os_print("?OUT OF MEMORY\n");
         return;
     }
     str_vars[i].dimmed = 1;
@@ -170,7 +170,7 @@ void array_dim(const char *name, int s1, int s2) {
     int i = array_find(name);
     if (i < 0) {
         if (array_count >= MAX_VARS) {
-            terminal_print("?TOO MANY VARIABLES\n");
+            os_print("?TOO MANY VARIABLES\n");
             return;
         }
         i = array_count++;
@@ -182,7 +182,7 @@ void array_dim(const char *name, int s1, int s2) {
     int total = s2 > 0 ? s1 * s2 : s1;
     arrays[i].vals = basic_alloc(total * sizeof(double));
     if (!arrays[i].vals) {
-        terminal_print("?OUT OF MEMORY\n");
+        os_print("?OUT OF MEMORY\n");
         return;
     }
     arrays[i].dimmed = 1;
@@ -194,19 +194,19 @@ void array_dim(const char *name, int s1, int s2) {
 double array_get(const char *name, int i1, int i2) {
     int a = array_find(name);
     if (a < 0 || !arrays[a].dimmed || !arrays[a].vals) {
-        terminal_print("?ARRAY NOT DIMMED\n");
+        os_print("?ARRAY NOT DIMMED\n");
         return 0.0;
     }
     int idx;
     if (arrays[a].size2 > 0) {
         if (i1 < 0 || i1 >= arrays[a].size1 || i2 < 0 || i2 >= arrays[a].size2) {
-            terminal_print("?BAD SUBSCRIPT\n");
+            os_print("?BAD SUBSCRIPT\n");
             return 0.0;
         }
         idx = i1 * arrays[a].size2 + i2;
     } else {
         if (i1 < 0 || i1 >= arrays[a].size1) {
-            terminal_print("?BAD SUBSCRIPT\n");
+            os_print("?BAD SUBSCRIPT\n");
             return 0.0;
         }
         idx = i1;
@@ -217,19 +217,19 @@ double array_get(const char *name, int i1, int i2) {
 void array_set(const char *name, int i1, int i2, double val) {
     int a = array_find(name);
     if (a < 0 || !arrays[a].dimmed || !arrays[a].vals) {
-        terminal_print("?ARRAY NOT DIMMED\n");
+        os_print("?ARRAY NOT DIMMED\n");
         return;
     }
     int idx;
     if (arrays[a].size2 > 0) {
         if (i1 < 0 || i1 >= arrays[a].size1 || i2 < 0 || i2 >= arrays[a].size2) {
-            terminal_print("?BAD SUBSCRIPT\n");
+            os_print("?BAD SUBSCRIPT\n");
             return;
         }
         idx = i1 * arrays[a].size2 + i2;
     } else {
         if (i1 < 0 || i1 >= arrays[a].size1) {
-            terminal_print("?BAD SUBSCRIPT\n");
+            os_print("?BAD SUBSCRIPT\n");
             return;
         }
         idx = i1;

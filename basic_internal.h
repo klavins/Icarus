@@ -2,15 +2,8 @@
 #define BASIC_INTERNAL_H
 
 #include "basic.h"
-#include "vga.h"
+#include "os.h"
 #include "klib.h"
-#include "keyboard.h"
-#include "speaker.h"
-#include "io.h"
-#include "fs.h"
-#include "graphics.h"
-#include "sysinfo.h"
-#include "interrupts.h"
 
 /* ---- Constants ---- */
 

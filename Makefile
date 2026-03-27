@@ -9,7 +9,7 @@ LDFLAGS = -T linker.ld -ffreestanding -O2 -nostdlib -lgcc
 BUILD   = build
 COMMON  = $(BUILD)/boot.o $(BUILD)/klib.o $(BUILD)/boot_info.o \
           $(BUILD)/keyboard.o $(BUILD)/speaker.o $(BUILD)/ata.o $(BUILD)/fs.o \
-          $(BUILD)/graphics.o $(BUILD)/interrupts.o $(BUILD)/math.o \
+          $(BUILD)/graphics.o $(BUILD)/interrupts.o $(BUILD)/math.o $(BUILD)/os.o \
           $(BUILD)/basic_vars.o $(BUILD)/basic_token.o $(BUILD)/basic_expr.o \
           $(BUILD)/basic_exec.o $(BUILD)/basic.o $(BUILD)/kernel.o
 OBJS    = $(COMMON) $(BUILD)/vga.o
