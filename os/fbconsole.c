@@ -20,6 +20,8 @@ static size_t cursor_row;
 static size_t cursor_col;
 static uint32_t fg_color;
 static uint32_t bg_color;
+static int raw_fg;
+static int raw_bg;
 
 /* UEFI framebuffer info — set by uefi_boot.c if UEFI, zero otherwise */
 struct framebuffer_info {
@@ -198,13 +200,20 @@ void terminal_init(void) {
 }
 
 void terminal_setcolor(enum vga_color fg, enum vga_color bg) {
+    raw_fg = fg & 0x0F;
+    raw_bg = bg & 0x0F;
     if (fb_bpp == 4) {
-        fg_color = color32_map[fg & 0x0F];
-        bg_color = color32_map[bg & 0x0F];
+        fg_color = color32_map[raw_fg];
+        bg_color = color32_map[raw_bg];
     } else {
-        fg_color = color8_map[fg & 0x0F];
-        bg_color = color8_map[bg & 0x0F];
+        fg_color = color8_map[raw_fg];
+        bg_color = color8_map[raw_bg];
     }
+}
+
+void terminal_getcolor(int *fg, int *bg) {
+    *fg = raw_fg;
+    *bg = raw_bg;
 }
 
 void terminal_clear(void) {

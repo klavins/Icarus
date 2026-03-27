@@ -52,6 +52,8 @@ static void program_insert(int linenum, const char *text) {
 /* ---- DOS Menu ---- */
 
 static void dos_menu(void) {
+    int save_fg, save_bg;
+    os_get_color(&save_fg, &save_bg);
     for (;;) {
         os_set_color(OS_YELLOW, OS_BLACK);
         os_print("\n");
@@ -73,8 +75,10 @@ static void dos_menu(void) {
         os_putchar(c);
         os_putchar('\n');
 
-        if (c == 'b' || c == 'B')
+        if (c == 'b' || c == 'B') {
+            os_set_color(save_fg, save_bg);
             return;
+        }
 
         if (c == 'd' || c == 'D') {
             os_print("\n");

@@ -564,6 +564,7 @@ void run_program(void) {
     }
     running = 0;
     os_flush_keys();
+    os_set_color(OS_WHITE, OS_BLACK);
 }
 
 void list_program(void) {

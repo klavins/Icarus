@@ -17,6 +17,7 @@ void os_print(const char *s);
 void os_putchar(char c);
 void os_printf(const char *fmt, ...);
 void os_set_color(int fg, int bg);
+void os_get_color(int *fg, int *bg);
 void os_clear_screen(void);
 size_t os_cursor_col(void);
 

@@ -16,6 +16,7 @@ enum vga_color {
 
 void terminal_init(void);
 void terminal_setcolor(enum vga_color fg, enum vga_color bg);
+void terminal_getcolor(int *fg, int *bg);
 void terminal_clear(void);
 void terminal_putchar(char c);
 void terminal_print(const char *s);

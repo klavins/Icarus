@@ -33,7 +33,7 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 - Immediate mode and stored program execution
 - Line-number based program editing
 - Multi-character variable names
-- Double-precision floating point arithmetic with operator precedence
+- Double-precision floating point arithmetic with operator precedence and MOD
 - String variables (DIM and $)
 - 1D and 2D arrays
 - Built-in functions: RND, ABS, INT, SQR, SIN, COS, LEN, PEEK

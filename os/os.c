@@ -25,6 +25,7 @@ void os_printf(const char *fmt, ...) {
 }
 
 void os_set_color(int fg, int bg) { terminal_setcolor(fg, bg); }
+void os_get_color(int *fg, int *bg) { terminal_getcolor(fg, bg); }
 void os_clear_screen(void) { terminal_clear(); }
 size_t os_cursor_col(void) { return terminal_getcol(); }
 

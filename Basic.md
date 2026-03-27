@@ -33,11 +33,14 @@ Hex literals use the `0x` prefix. They are stored as doubles like all numbers.
 
 ## Expressions
 
-Arithmetic: `+`, `-`, `*`, `/`, `(`, `)`
+Arithmetic: `+`, `-`, `*`, `/`, `MOD`, `(`, `)`
 
     PRINT 2 + 3 * (4 - 1)
     PRINT 1 / 3
     PRINT 3.14 * 2
+    PRINT 10 MOD 3
+
+`MOD` returns the integer remainder. It has the same precedence as `*` and `/`. Operands are truncated to integers before the operation.
 
 Comparisons (used with IF): `=`, `<`, `>`, `<=`, `>=`, `<>`
 

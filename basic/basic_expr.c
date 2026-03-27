@@ -135,15 +135,18 @@ static double parse_factor(void) {
 
 static double parse_term(void) {
     double val = parse_factor();
-    while (tok_pos->type == TOK_STAR || tok_pos->type == TOK_SLASH) {
+    while (tok_pos->type == TOK_STAR || tok_pos->type == TOK_SLASH || tok_pos->type == TOK_MOD) {
         enum token_type op = tok_pos->type;
         tok_pos++;
         double right = parse_factor();
         if (op == TOK_STAR)
             val = val * right;
-        else if (right != 0.0)
-            val = val / right;
-        else {
+        else if (right != 0.0) {
+            if (op == TOK_SLASH)
+                val = val / right;
+            else
+                val = (double)((int)val % (int)right);
+        } else {
             os_print("?DIVISION BY ZERO\n");
             expr_overflow = 1;
             return 0.0;

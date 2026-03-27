@@ -42,6 +42,7 @@ enum token_type {
     TOK_MINUS,
     TOK_STAR,
     TOK_SLASH,
+    TOK_MOD,
     TOK_EQUAL,
     TOK_LPAREN,
     TOK_RPAREN,
