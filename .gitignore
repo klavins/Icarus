@@ -1,0 +1,10 @@
+*.o
+*.bin
+*.iso
+*.img
+*.so
+*.EFI
+build/
+build-efi/
+build-efi64/
+isodir/
