@@ -39,6 +39,7 @@ int program_find(int linenum);
 /* ---- Shared state: expression evaluator (defined in basic_expr.c) ---- */
 
 extern struct token *tok_pos;
+extern int expr_overflow;
 
 /* ---- Shared state: executor (defined in basic_exec.c) ---- */
 

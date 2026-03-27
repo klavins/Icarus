@@ -1,8 +1,46 @@
 #include "basic_internal.h"
+#include <limits.h>
 
 /* ---- Expression evaluator ---- */
 
 struct token *tok_pos;
+int expr_overflow;  /* set to 1 on overflow, checked by executor */
+
+static int checked_add(int a, int b) {
+    if ((b > 0 && a > INT_MAX - b) || (b < 0 && a < INT_MIN - b)) {
+        expr_overflow = 1;
+        return 0;
+    }
+    return a + b;
+}
+
+static int checked_sub(int a, int b) {
+    if ((b < 0 && a > INT_MAX + b) || (b > 0 && a < INT_MIN + b)) {
+        expr_overflow = 1;
+        return 0;
+    }
+    return a - b;
+}
+
+static int checked_mul(int a, int b) {
+    if (a == 0 || b == 0) return 0;
+    if ((a > 0 && b > 0 && a > INT_MAX / b) ||
+        (a < 0 && b < 0 && a < INT_MAX / b) ||
+        (a > 0 && b < 0 && b < INT_MIN / a) ||
+        (a < 0 && b > 0 && a < INT_MIN / b)) {
+        expr_overflow = 1;
+        return 0;
+    }
+    return a * b;
+}
+
+static int checked_neg(int a) {
+    if (a == INT_MIN) {
+        expr_overflow = 1;
+        return 0;
+    }
+    return -a;
+}
 
 /* Simple linear congruential PRNG -- seeded from PIT timer on first call */
 static uint32_t rng_state;
@@ -97,7 +135,7 @@ static int parse_factor(void) {
     }
     if (tok_pos->type == TOK_MINUS) {
         tok_pos++;
-        return -parse_factor();
+        return checked_neg(parse_factor());
     }
     return 0;
 }
@@ -109,23 +147,29 @@ static int parse_term(void) {
         tok_pos++;
         int right = parse_factor();
         if (op == TOK_STAR)
-            val *= right;
+            val = checked_mul(val, right);
         else if (right != 0)
             val /= right;
+        else {
+            terminal_print("?DIVISION BY ZERO\n");
+            expr_overflow = 1;
+            return 0;
+        }
     }
     return val;
 }
 
 int parse_expr(void) {
+    expr_overflow = 0;
     int val = parse_term();
     while (tok_pos->type == TOK_PLUS || tok_pos->type == TOK_MINUS) {
         enum token_type op = tok_pos->type;
         tok_pos++;
         int right = parse_term();
         if (op == TOK_PLUS)
-            val += right;
+            val = checked_add(val, right);
         else
-            val -= right;
+            val = checked_sub(val, right);
     }
     return val;
 }

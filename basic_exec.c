@@ -576,6 +576,12 @@ void run_program(void) {
         }
 
         exec_tokens(&tokens[0]);
+
+        if (expr_overflow) {
+            terminal_printf("?OVERFLOW IN LINE %d\n", program[idx].linenum);
+            running = 0;
+            break;
+        }
     }
     running = 0;
     keybuf_flush();
