@@ -42,6 +42,8 @@ struct framebuffer_info_fixed {
     char     firmware_vendor[64];
     uint32_t firmware_revision;
     uint32_t pixel_format;
+    uint32_t heap_base;
+    uint32_t heap_size;
 };
 #define FB_INFO_FIXED ((volatile struct framebuffer_info_fixed *)0x00080000)
 

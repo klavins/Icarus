@@ -17,7 +17,6 @@
 #define MAX_VARS       128
 #define MAX_VAR_NAME   32
 #define MAX_STR_LEN    256
-#define MAX_ARRAY_SIZE 4096
 #define MAX_LINES      10000
 #define MAX_LINE_LEN   256
 #define MAX_FOR_DEPTH  32
@@ -28,7 +27,7 @@
 
 struct program_line {
     int linenum;
-    char text[MAX_LINE_LEN];
+    char *text;
 };
 
 extern struct program_line program[];
@@ -109,5 +108,13 @@ void list_program(void);
 void collect_data(void);
 int  read_line(char *buf, int max);
 double parse_number_string(const char *buf);
+
+/* ---- Bump allocator (basic_vars.c) ---- */
+
+void   basic_heap_init(void);
+void  *basic_alloc(size_t size);
+void   basic_alloc_reset(void);
+void   basic_alloc_set_watermark(void);
+size_t basic_heap_free(void);
 
 #endif

@@ -33,13 +33,17 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 - Immediate mode and stored program execution
 - Line-number based program editing
 - Multi-character variable names
-- Integer arithmetic with operator precedence
+- Double-precision floating point arithmetic with operator precedence
 - String variables (DIM and $)
 - 1D and 2D arrays
-- Commands: PRINT, LET, DIM, IF/THEN, FOR/NEXT, GOTO, GOSUB/RETURN, ON GOTO/GOSUB, READ/DATA/RESTORE, INPUT, PAUSE
-- Graphics: GRAPHICS, PLOT, DRAWTO, COLOR
+- Built-in functions: RND, ABS, INT, SQR, SIN, COS, LEN, PEEK
+- Constants: PI, SCRW, SCRH
+- Hex number literals (0xFF)
+- Commands: PRINT, LET, DIM, IF/THEN, FOR/NEXT, GOTO, GOSUB/RETURN, ON GOTO/GOSUB, READ/DATA/RESTORE, INPUT, PAUSE, DELAY, POKE, REM
+- Graphics: GRAPHICS (4 resolution modes), PLOT, DRAWTO, COLOR, POS, TEXT
 - Sound: SOUND (PC speaker, Atari BASIC syntax)
 - Disk: SAVE, LOAD, DIR, DELETE, FORMAT, DOS
+- Dynamic memory: bump allocator with watermark for program text, variables, and arrays
 - System: RUN, LIST, CLR, QUIT
 
 ## Requirements
@@ -185,7 +189,7 @@ RUN
 
 ## Memory Map
 
-When ICARUS boots via UEFI, the 64-bit EFI stub collects hardware information and passes control to the kernel. The following memory regions are used:
+When ICARUS boots via UEFI, the 64-bit EFI stub collects hardware information, locates free memory for the kernel heap, and passes control to the kernel. The following memory regions are used:
 
 ```
 Address         Size        Description
@@ -197,18 +201,20 @@ Address         Size        Description
                              +0x081  Last key ASCII
                              +0x084  Timer tick count (32-bit)
                              +0x088  Uptime seconds (32-bit)
-0x00080000      92 bytes    UEFI boot info (framebuffer addr, resolution, memory, firmware)
+0x00080000      ~100 bytes  UEFI boot info (framebuffer, memory, firmware, heap location)
 0x00090000      64 KB       Kernel stack
-0x00100000+     ~19 MB      Kernel code and data (loaded by UEFI)
-                             .text    Code
-                             .rodata  String literals, font data, VGA palette
-                             .data    Initialized globals
-                             .bss     Shadow framebuffer (~9 MB)
-                                      Framebuffer save buffer (~9 MB)
-                                      BASIC variable tables
-                                      BASIC program store
-                                      Interrupt descriptor table
-                                      Global descriptor table
+0x00100000+     ~700 KB     Kernel code and data (loaded by UEFI)
+                             .text    Code (~200 KB)
+                             .rodata  String literals, font data, VGA palette (~50 KB)
+                             .data    Small initialized globals
+                             .bss     IDT, GDT, small static tables (~1 MB)
+0x01000000+     163+ MB     Kernel heap (bump allocator, size from UEFI memory map)
+                             Shadow framebuffer (allocated at boot, ~4 MB)
+                             Framebuffer save buffer (allocated at boot, ~4 MB)
+                             ── watermark ── (CLR resets to here)
+                             BASIC program text (allocated per line)
+                             BASIC variables and arrays (allocated on DIM)
+                             BASIC string variable data (allocated on DIM)
 0xFD000000+     ~4 MB       GOP framebuffer (address varies, provided by UEFI)
                              1280x800x4 bytes on our test hardware
                              Written by gfx_present() from shadow buffer
@@ -216,32 +222,33 @@ Address         Size        Description
 
 The system status area at `0x70000` is readable from BASIC via `PEEK`. The interrupt handler updates key state and timer ticks here in real time. See `sysinfo.h` for the full layout.
 
+Memory is managed by a bump allocator. The UEFI boot stub finds the largest free memory region (163 MB in QEMU with 256 MB RAM, much larger on real hardware). Framebuffer buffers are allocated first, then a watermark is set. BASIC data (program text, variables, arrays) is allocated above the watermark and freed on `CLR`. The `FREE` command (planned) will show remaining heap space.
+
 ## Project Structure
 
 ### Kernel
 | File | Description |
 |------|-------------|
-| `boot.asm` | Multiboot entry point and stack setup |
 | `kernel.c` | Main kernel entry, BASIC REPL loop |
-| `linker.ld` | Linker script (kernel loads at 1MB) |
-| `multiboot.h` | Multiboot header struct and flag definitions |
 | `boot_info.c/h` | Hardware detection (CPUID, memory, EFLAGS, ATA) |
 
 ### Display
 | File | Description |
 |------|-------------|
-| `vga.c/h` | VGA text mode driver (80x25) |
-| `fbconsole.c` | Framebuffer text renderer (Mode 13h and UEFI GOP) |
+| `fbconsole.c` | Framebuffer text renderer (UEFI GOP) |
 | `font_8x16.h` | 8x16 bitmap font for framebuffer rendering |
-| `graphics.c/h` | Pixel graphics mode (PLOT, DRAWTO, line drawing) |
+| `graphics.c/h` | Pixel graphics with double buffering, scaling, and text overlay |
 
 ### Drivers
 | File | Description |
 |------|-------------|
-| `keyboard.c/h` | PS/2 keyboard polling with shift support |
+| `keyboard.c/h` | Interrupt-driven keyboard input via ring buffer |
+| `interrupts.c/h` | IDT, GDT, PIC setup; timer and keyboard ISRs |
+| `sysinfo.h` | System status area layout (key state, timer ticks) |
 | `speaker.c/h` | PC speaker tone generation |
 | `ata.c/h` | ATA PIO disk read/write with timeouts |
 | `io.h` | Port I/O functions (inb, outb, inw, outw) |
+| `math.c/h` | Freestanding math functions (sin, cos, sqrt) |
 
 ### Filesystem
 | File | Description |
@@ -251,7 +258,12 @@ The system status area at `0x70000` is readable from BASIC via `PEEK`. The inter
 ### BASIC Interpreter
 | File | Description |
 |------|-------------|
-| `basic.c/h` | Tokenizer, expression parser, and command executor |
+| `basic.c/h` | Public API, program store, serialization, DOS menu |
+| `basic_internal.h` | Shared constants, structs, and internal function prototypes |
+| `basic_token.c` | Tokenizer and keyword lookup |
+| `basic_expr.c` | Expression parser, RNG, built-in functions |
+| `basic_exec.c` | Statement dispatcher (switch-based), runtime stacks |
+| `basic_vars.c` | Variable storage, bump allocator |
 
 ### C Library
 | File | Description |

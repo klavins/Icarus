@@ -9,6 +9,7 @@
  *   3 = 800x600
  *   4 = native resolution
  */
+void graphics_alloc_init(void);
 void gfx_set_mode(int mode);
 int  gfx_get_mode(void);
 int  gfx_width(void);

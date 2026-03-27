@@ -1,4 +1,5 @@
 #include "graphics.h"
+#include "basic_internal.h"
 #include "io.h"
 #include "klib.h"
 #include "vga.h"
@@ -17,8 +18,7 @@ static uint32_t  gfx_fb_pitch;
 static uint32_t  gfx_fb_bpp;
 
 /* Shadow (back) buffer — all drawing goes here, then copied to real FB */
-#define MAX_SHADOW_FB (1920 * 1200 * 4)
-static uint8_t shadow_fb[MAX_SHADOW_FB];
+static uint8_t *shadow_fb;
 static uint8_t *draw_buf;      /* points to shadow_fb in graphics mode */
 static uint32_t shadow_fb_size;
 
@@ -58,9 +58,8 @@ static uint32_t vga_to_rgb32(int color);
 static uint8_t  saved_font[256 * 32];
 static uint16_t saved_text[VGA_TEXT_SIZE];
 
-/* Saved framebuffer for UEFI mode (up to 1024x768x4 = 3MB) */
-#define MAX_SAVED_FB (1920 * 1200 * 4)
-static uint8_t saved_fb[MAX_SAVED_FB];
+/* Saved framebuffer for UEFI mode */
+static uint8_t *saved_fb;
 static uint32_t saved_fb_size;
 
 /* VGA register tables for Mode 13h */
@@ -166,6 +165,19 @@ static void setup_virtual_res(int mode) {
     }
 }
 
+void graphics_alloc_init(void) {
+    uint8_t *addr;
+    uint32_t w, h, p, b;
+    terminal_get_fb(&addr, &w, &h, &p, &b);
+    if (addr && w > 0) {
+        uint32_t size = p * b * h;  /* pitch_pixels * bpp * height = total bytes */
+        shadow_fb = basic_alloc(size);
+        saved_fb = basic_alloc(size);
+        shadow_fb_size = size;
+        saved_fb_size = size;
+    }
+}
+
 void gfx_set_mode(int mode) {
     if (mode < 0 || mode > 4) return;
 
@@ -177,10 +189,9 @@ void gfx_set_mode(int mode) {
     if (mode >= 1 && current_mode == 0) {
         /* Entering graphics from text */
         if (using_fb_console) {
-            saved_fb_size = gfx_fb_pitch * gfx_fb_height;
-            if (saved_fb_size > MAX_SAVED_FB)
-                saved_fb_size = MAX_SAVED_FB;
-            memcpy(saved_fb, gfx_fb_addr, saved_fb_size);
+            uint32_t needed = gfx_fb_pitch * gfx_fb_height;
+            if (saved_fb && needed <= saved_fb_size)
+                memcpy(saved_fb, gfx_fb_addr, needed);
         } else {
             /* VGA text mode — save screen, switch to Mode 13h */
             for (int i = 0; i < VGA_TEXT_SIZE; i++)
@@ -195,9 +206,7 @@ void gfx_set_mode(int mode) {
             gfx_fb_bpp    = 1;
         }
         /* Set up shadow buffer */
-        shadow_fb_size = gfx_fb_pitch * gfx_fb_height;
-        if (shadow_fb_size > MAX_SHADOW_FB)
-            shadow_fb_size = MAX_SHADOW_FB;
+        if (!shadow_fb) return;  /* no buffer allocated */
         draw_buf = shadow_fb;
         dirty_reset();
 
@@ -219,8 +228,11 @@ void gfx_set_mode(int mode) {
         /* Return to text */
         if (using_fb_console) {
             asm volatile ("cli");
-            if (saved_fb_size > 0)
-                memcpy(gfx_fb_addr, saved_fb, saved_fb_size);
+            if (saved_fb && saved_fb_size > 0) {
+                uint32_t needed = gfx_fb_pitch * gfx_fb_height;
+                if (needed <= saved_fb_size)
+                    memcpy(gfx_fb_addr, saved_fb, needed);
+            }
             asm volatile ("sti");
         } else {
             write_regs(mode03h_misc, mode03h_seq, 5, mode03h_crtc, 25,

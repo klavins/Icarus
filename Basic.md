@@ -21,20 +21,41 @@ Commands can be entered directly (immediate mode) or stored as numbered lines (p
 - String variables: end with $ (e.g., N$, NAME$). Must be DIMmed before use.
 - Arrays: A(n) or A(r,c) for 2D. Must be DIMmed before use.
 
+## Numbers
+
+All numbers are double-precision floating point. Integer and decimal literals are supported:
+
+    PRINT 42
+    PRINT 3.14
+    PRINT 0xFF
+
+Hex literals use the `0x` prefix. They are stored as doubles like all numbers.
+
 ## Expressions
 
 Arithmetic: `+`, `-`, `*`, `/`, `(`, `)`
 
     PRINT 2 + 3 * (4 - 1)
+    PRINT 1 / 3
+    PRINT 3.14 * 2
 
 Comparisons (used with IF): `=`, `<`, `>`, `<=`, `>=`, `<>`
 
 ### Built-in Functions
 
-    RND(N)     Random integer from 0 to N-1
+    RND(N)     Random integer from 0 to N-1 (N > 1)
+    RND        Random float from 0.0 to ~1.0 (no argument)
     ABS(N)     Absolute value
+    INT(N)     Truncate to integer (INT(3.7) = 3)
+    SQR(N)     Square root
+    SIN(N)     Sine (radians)
+    COS(N)     Cosine (radians)
     LEN(A$)    Length of a string
     PEEK(addr) Read a byte from memory
+
+### Built-in Values
+
+    PI         3.14159265358979...
     SCRW       Screen width in pixels
     SCRH       Screen height in pixels
 
@@ -61,13 +82,14 @@ Assign a value to a variable.
 
 ### DIM
 
-Declare a string variable or array with a given size.
+Declare a string variable or array with a given size. Memory is allocated dynamically from the heap — arrays can be any size that fits in available memory.
 
     DIM A$(20)
     DIM A(10)
+    DIM A(100000)
     DIM M(3,3)
 
-String variables must be DIMmed before assignment. Arrays are 0-based.
+String variables must be DIMmed before assignment. Arrays are 0-based. If memory is exhausted, prints `?OUT OF MEMORY`. Use `CLR` to free all allocated memory.
 
 ### IF...THEN
 
@@ -313,7 +335,7 @@ Display the stored program.
 
 ### CLR
 
-Clear the stored program and all variables.
+Clear the stored program, all variables, and free all dynamically allocated memory (arrays, strings, program text).
 
     CLR
 
@@ -420,6 +442,32 @@ Enter the Atari-style disk utility menu with options for Directory, Load, Save, 
     100 PRINT "SQUARE OF ", X, " IS ", X * X
     110 RETURN
     999 PRINT "DONE"
+    RUN
+
+### Floating Point Math
+
+    10 PRINT "PI = ", PI
+    20 PRINT "SIN(PI/4) = ", SIN(PI / 4)
+    30 PRINT "COS(PI/4) = ", COS(PI / 4)
+    40 PRINT "SQR(2) = ", SQR(2)
+    50 FOR X = 0 TO 1 STEP 0.1
+    60 PRINT X, " "
+    70 NEXT X
+    RUN
+
+### Circles with Trig
+
+    10 GRAPHICS 4
+    20 LET CX = SCRW / 2
+    30 LET CY = SCRH / 2
+    40 COLOR 14
+    50 FOR A = 0 TO 6.28 STEP 0.05
+    60 LET X = CX + INT(200 * COS(A))
+    70 LET Y = CY + INT(200 * SIN(A))
+    80 PLOT X, Y
+    90 NEXT A
+    100 PAUSE
+    110 GRAPHICS 0
     RUN
 
 ## Host Disk Utility (idu)

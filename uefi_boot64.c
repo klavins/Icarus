@@ -18,6 +18,8 @@ struct framebuffer_info {
     char     firmware_vendor[64];
     uint32_t firmware_revision;
     uint32_t pixel_format;
+    uint32_t heap_base;
+    uint32_t heap_size;
 };
 
 /* kernel_main — compiled as 64-bit for this build */
@@ -99,6 +101,37 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
     }
 
     fb->total_memory_kb = sum_memory(memmap, mapSize, descSize);
+
+    /* Find largest conventional memory region above 1MB for kernel heap */
+    {
+        uint64_t best_base = 0, best_size = 0;
+        for (UINTN off = 0; off < mapSize; off += descSize) {
+            EFI_MEMORY_DESCRIPTOR *desc = (EFI_MEMORY_DESCRIPTOR *)(memmap + off);
+            if (desc->Type == EfiConventionalMemory) {
+                uint64_t base = desc->PhysicalStart;
+                uint64_t size = desc->NumberOfPages * 4096;
+                /* Skip regions below 1MB (used by kernel/BIOS) */
+                if (base < 0x100000) continue;
+                /* Use portion above 16MB to avoid kernel code/data */
+                if (base < 0x1000000) {
+                    if (base + size <= 0x1000000) continue;
+                    size -= (0x1000000 - base);
+                    base = 0x1000000;
+                }
+                /* Keep within 32-bit addressable range */
+                if (base >= 0x100000000ULL) continue;
+                if (base + size > 0x100000000ULL)
+                    size = 0x100000000ULL - base;
+                if (size > best_size) {
+                    best_base = base;
+                    best_size = size;
+                }
+            }
+        }
+        fb->heap_base = (uint32_t)best_base;
+        fb->heap_size = (uint32_t)best_size;
+        Print(L"Heap: 0x%x, %d MB\r\n", (UINTN)best_base, (UINTN)(best_size / (1024*1024)));
+    }
 
     Print(L"Memory: %d MB\r\n", fb->total_memory_kb / 1024);
     Print(L"Exiting boot services...\r\n");

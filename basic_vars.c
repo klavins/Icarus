@@ -1,5 +1,54 @@
 #include "basic_internal.h"
 
+/* ---- Bump allocator ---- */
+
+static uint8_t *heap_base;
+static size_t heap_size;
+static size_t heap_pos;
+static size_t heap_watermark;
+
+void basic_heap_init(void) {
+    /* Read heap info from boot info at 0x80000 */
+    struct {
+        uint32_t addr_lo, width, height, pitch, bpp, total_memory_kb;
+        char firmware_vendor[64];
+        uint32_t firmware_revision, pixel_format;
+        uint32_t heap_base, heap_size;
+    } *info = (void *)0x80000;
+
+    if (info->heap_base && info->heap_size) {
+        heap_base = (uint8_t *)(uintptr_t)info->heap_base;
+        heap_size = info->heap_size;
+    } else {
+        /* Fallback: use memory at 16MB for non-UEFI builds */
+        heap_base = (uint8_t *)0x1000000;
+        heap_size = 4 * 1024 * 1024;
+    }
+    heap_pos = 0;
+    heap_watermark = 0;
+}
+
+void *basic_alloc(size_t size) {
+    /* Align to 8 bytes */
+    size = (size + 7) & ~(size_t)7;
+    if (heap_pos + size > heap_size) return (void *)0;
+    void *p = heap_base + heap_pos;
+    heap_pos += size;
+    return p;
+}
+
+void basic_alloc_set_watermark(void) {
+    heap_watermark = heap_pos;
+}
+
+void basic_alloc_reset(void) {
+    heap_pos = heap_watermark;
+}
+
+size_t basic_heap_free(void) {
+    return heap_size - heap_pos;
+}
+
 /* ---- Numeric variables ---- */
 
 static struct {
@@ -43,7 +92,7 @@ static struct {
     char name[MAX_VAR_NAME];
     int  dimmed;
     int  maxlen;
-    char val[MAX_STR_LEN];
+    char *val;
 } str_vars[MAX_VARS];
 int str_var_count;
 
@@ -56,7 +105,7 @@ int strvar_find(const char *name) {
 
 const char *strvar_get(const char *name) {
     int i = strvar_find(name);
-    if (i >= 0) return str_vars[i].val;
+    if (i >= 0 && str_vars[i].val) return str_vars[i].val;
     return "";
 }
 
@@ -66,7 +115,7 @@ void strvar_set(const char *name, const char *val) {
         terminal_print("?STRING NOT DIMMED\n");
         return;
     }
-    if (!str_vars[i].dimmed) {
+    if (!str_vars[i].dimmed || !str_vars[i].val) {
         terminal_print("?STRING NOT DIMMED\n");
         return;
     }
@@ -89,6 +138,11 @@ void strvar_dim(const char *name, int size) {
     }
     if (size < 1) size = 1;
     if (size > MAX_STR_LEN) size = MAX_STR_LEN;
+    str_vars[i].val = basic_alloc(size);
+    if (!str_vars[i].val) {
+        terminal_print("?OUT OF MEMORY\n");
+        return;
+    }
     str_vars[i].dimmed = 1;
     str_vars[i].maxlen = size;
     str_vars[i].val[0] = '\0';
@@ -101,7 +155,7 @@ static struct {
     int  dimmed;
     int  size1;
     int  size2;
-    double vals[MAX_ARRAY_SIZE];
+    double *vals;
 } arrays[MAX_VARS];
 int array_count;
 
@@ -126,8 +180,9 @@ void array_dim(const char *name, int s1, int s2) {
     if (s1 < 1) s1 = 1;
     if (s2 < 0) s2 = 0;
     int total = s2 > 0 ? s1 * s2 : s1;
-    if (total > MAX_ARRAY_SIZE) {
-        terminal_print("?ARRAY TOO LARGE\n");
+    arrays[i].vals = basic_alloc(total * sizeof(double));
+    if (!arrays[i].vals) {
+        terminal_print("?OUT OF MEMORY\n");
         return;
     }
     arrays[i].dimmed = 1;
@@ -138,7 +193,7 @@ void array_dim(const char *name, int s1, int s2) {
 
 double array_get(const char *name, int i1, int i2) {
     int a = array_find(name);
-    if (a < 0 || !arrays[a].dimmed) {
+    if (a < 0 || !arrays[a].dimmed || !arrays[a].vals) {
         terminal_print("?ARRAY NOT DIMMED\n");
         return 0.0;
     }
@@ -161,7 +216,7 @@ double array_get(const char *name, int i1, int i2) {
 
 void array_set(const char *name, int i1, int i2, double val) {
     int a = array_find(name);
-    if (a < 0 || !arrays[a].dimmed) {
+    if (a < 0 || !arrays[a].dimmed || !arrays[a].vals) {
         terminal_print("?ARRAY NOT DIMMED\n");
         return;
     }

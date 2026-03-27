@@ -16,6 +16,12 @@ static void program_insert(int linenum, const char *text) {
     int idx = program_find(linenum);
     if (idx >= 0) {
         /* Replace existing line */
+        int len = strlen(text);
+        program[idx].text = basic_alloc(len + 1);
+        if (!program[idx].text) {
+            terminal_print("?OUT OF MEMORY\n");
+            return;
+        }
         strcpy(program[idx].text, text);
         return;
     }
@@ -28,6 +34,12 @@ static void program_insert(int linenum, const char *text) {
     while (i > 0 && program[i - 1].linenum > linenum) {
         program[i] = program[i - 1];
         i--;
+    }
+    int len = strlen(text);
+    program[i].text = basic_alloc(len + 1);
+    if (!program[i].text) {
+        terminal_print("?OUT OF MEMORY\n");
+        return;
     }
     program[i].linenum = linenum;
     strcpy(program[i].text, text);
@@ -114,6 +126,7 @@ static void dos_menu(void) {
 /* ---- Init ---- */
 
 void basic_init(void) {
+    basic_alloc_reset();
     program_count = 0;
     for_depth = 0;
     gosub_depth = 0;

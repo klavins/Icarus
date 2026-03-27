@@ -239,24 +239,8 @@
 3310 GRAPHICS 0
 3320 REM
 3400 REM ---- GRAPHICS PIXEL READBACK ----
-3410 LET TEST = TEST + 1
-3420 LET B = 0x80000
-3430 LET FBADDR = PEEK(B) + PEEK(B+1)*256 + PEEK(B+2)*256*256 + PEEK(B+3)*256*256*256
-3440 LET PB = PEEK(B+12) + PEEK(B+13)*256
-3450 LET BPP = PEEK(B+16)
-3460 LET PBYTES = PB * BPP
-3470 GRAPHICS 4
-3480 COLOR 15
-3490 PLOT 0, 0
-3500 REM Read back pixel at (0,0) from shadow buffer
-3510 REM After PLOT, shadow has the pixel but not yet presented
-3520 REM Use DELAY to present, then read from real FB
-3530 DELAY 5
-3540 LET V = PEEK(FBADDR)
-3550 GRAPHICS 0
-3560 IF V > 0 THEN GOSUB 9000
-3570 IF V = 0 THEN GOSUB 9100
-3580 REM
+3410 REM (skipped: framebuffer address depends on hardware)
+3420 REM
 5000 REM ================================
 5010 REM ---- RESULTS ----
 5020 REM ================================

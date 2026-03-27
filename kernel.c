@@ -4,6 +4,8 @@
 #include "boot_info.h"
 #include "keyboard.h"
 #include "basic.h"
+#include "basic_internal.h"
+#include "graphics.h"
 #include "fs.h"
 #include "ata.h"
 #include "interrupts.h"
@@ -21,6 +23,8 @@ struct uefi_boot_info {
     char     firmware_vendor[64];
     uint32_t firmware_revision;
     uint32_t pixel_format;
+    uint32_t heap_base;
+    uint32_t heap_size;
 };
 extern struct uefi_boot_info uefi_info __attribute__((weak));
 
@@ -98,11 +102,15 @@ static void print_uefi_info(void) {
 
 void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
 
+    basic_heap_init();
     terminal_init();
     if (magic == MBOOT_MAGIC)
         boot_info_print(magic, mboot);
     else
         print_uefi_info();
+
+    graphics_alloc_init();
+    basic_alloc_set_watermark();
 
     fs_init();
     interrupts_init();
