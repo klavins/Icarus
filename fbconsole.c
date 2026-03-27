@@ -82,6 +82,15 @@ static inline void fb_pixel(uint32_t x, uint32_t y, uint32_t color) {
     }
 }
 
+static void draw_cursor(int show) {
+    uint32_t x0 = cursor_col * FONT_W;
+    uint32_t y0 = cursor_row * FONT_H + FONT_H - 2; /* bottom 2 rows */
+    uint32_t color = show ? fg_color : bg_color;
+    for (int y = 0; y < 2; y++)
+        for (int x = 0; x < FONT_W; x++)
+            fb_pixel(x0 + x, y0 + y, color);
+}
+
 static void fb_draw_char(uint32_t col, uint32_t row, unsigned char ch,
                           uint32_t fg, uint32_t bg) {
     uint32_t x0 = col * FONT_W;
@@ -208,14 +217,17 @@ void terminal_clear(void) {
     }
     cursor_row = 0;
     cursor_col = 0;
+    draw_cursor(1);
 }
 
 void terminal_putchar(char c) {
+    draw_cursor(0); /* erase cursor */
     if (c == '\b') {
         if (cursor_col > 0) {
             cursor_col--;
             fb_draw_char(cursor_col, cursor_row, ' ', fg_color, bg_color);
         }
+        draw_cursor(1);
         return;
     }
     if (c == '\n') {
@@ -224,6 +236,7 @@ void terminal_putchar(char c) {
             fb_scroll();
             cursor_row = fb_rows - 1;
         }
+        draw_cursor(1);
         return;
     }
     fb_draw_char(cursor_col, cursor_row, (unsigned char)c, fg_color, bg_color);
@@ -234,6 +247,7 @@ void terminal_putchar(char c) {
             cursor_row = fb_rows - 1;
         }
     }
+    draw_cursor(1);
 }
 
 void terminal_print(const char *s) {

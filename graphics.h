@@ -20,5 +20,6 @@ void gfx_drawto(int x, int y);
 void gfx_pixel(int x, int y, int color);
 void gfx_pos(int x, int y);
 void gfx_text(const char *str);
+void gfx_present(void);
 
 #endif

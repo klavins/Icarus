@@ -6,6 +6,8 @@
 #include "io.h"
 #include "fs.h"
 #include "graphics.h"
+#include "sysinfo.h"
+#include "interrupts.h"
 
 /* Atari BASIC pitch to approximate Hz.
    Atari: freq = 63920 / (2 * (pitch + 1))
@@ -336,6 +338,9 @@ static void collect_data(void) {
 
 static enum token_type keyword_type(const char *word) {
     if (strcmp(word, "REM") == 0)   return TOK_REM;
+    if (strcmp(word, "POKE") == 0)  return TOK_POKE;
+    if (strcmp(word, "DELAY") == 0)   return TOK_DELAY;
+    if (strcmp(word, "PRESENT") == 0) return TOK_PRESENT;
     if (strcmp(word, "PRINT") == 0) return TOK_PRINT;
     if (strcmp(word, "LET") == 0)   return TOK_LET;
     if (strcmp(word, "DIM") == 0)   return TOK_DIM;
@@ -425,6 +430,12 @@ static int parse_factor(void) {
                 int n = parse_expr();
                 if (tok_pos->type == TOK_RPAREN) tok_pos++;
                 return n < 0 ? -n : n;
+            }
+            if (strcmp(name, "PEEK") == 0) {
+                tok_pos++;
+                int addr = parse_expr();
+                if (tok_pos->type == TOK_RPAREN) tok_pos++;
+                return *((volatile uint8_t *)(uintptr_t)addr);
             }
             if (strcmp(name, "LEN") == 0) {
                 tok_pos++;
@@ -875,6 +886,29 @@ static void exec_tokens(struct token *t) {
         }
     } else if (t->type == TOK_REM) {
         /* Comment — skip */
+    } else if (t->type == TOK_POKE) {
+        /* POKE address, value */
+        t++;
+        tok_pos = t;
+        int addr = parse_expr();
+        if (tok_pos->type == TOK_COMMA) tok_pos++;
+        int val = parse_expr();
+        *((volatile uint8_t *)(uintptr_t)addr) = (uint8_t)val;
+    } else if (t->type == TOK_DELAY) {
+        /* DELAY n — wait for n milliseconds (timer runs at 200Hz = 5ms/tick) */
+        t++;
+        tok_pos = t;
+        int n = parse_expr();
+        gfx_present(); /* flush any drawing before waiting */
+        volatile uint32_t *ticks = SYS_TICKS_PTR;
+        uint32_t wait_ticks = (uint32_t)n / 5;
+        if (wait_ticks < 1) wait_ticks = 1;
+        uint32_t start = *ticks;
+        while ((*ticks - start) < wait_ticks)
+            asm volatile ("hlt");
+    } else if (t->type == TOK_PRESENT) {
+        /* PRESENT — flush shadow buffer to display */
+        gfx_present();
     } else if (t->type == TOK_DATA) {
         /* DATA lines are handled by collect_data, skip at runtime */
     } else if (t->type == TOK_READ) {
@@ -1045,7 +1079,8 @@ static void exec_tokens(struct token *t) {
             terminal_print("?SYNTAX ERROR\n");
         }
     } else if (t->type == TOK_PAUSE) {
-        /* PAUSE — wait for any keypress */
+        /* PAUSE — flush display and wait for any keypress */
+        gfx_present();
         keyboard_poll();
     } else if (t->type == TOK_POS) {
         /* POS x, y */
@@ -1084,6 +1119,8 @@ static void run_program(void) {
 
     while (running && next_line_idx < program_count) {
         if (keyboard_escape_pressed()) {
+            if (gfx_get_mode() >= 1)
+                gfx_set_mode(0);
             terminal_print("\n?BREAK\n");
             running = 0;
             break;
@@ -1102,6 +1139,7 @@ static void run_program(void) {
         exec_tokens(&tokens[0]);
     }
     running = 0;
+    keybuf_flush();
 }
 
 static void list_program(void) {

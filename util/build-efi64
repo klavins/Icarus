@@ -20,12 +20,12 @@ set -e
 CC=gcc
 OBJCOPY=objcopy
 
-CFLAGS="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -mno-sse -mno-mmx -mno-sse2 -I/usr/include/efi -I/usr/include/efi/x86_64 -DUEFI_BUILD -DGNU_EFI"
+CFLAGS="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -mno-sse -mno-mmx -mno-sse2 -fcf-protection=none -I/usr/include/efi -I/usr/include/efi/x86_64 -DUEFI_BUILD -DGNU_EFI"
 
 mkdir -p build-efi64
 
 echo "==> Compiling (64-bit)..."
-for f in uefi_boot64.c fbconsole.c klib.c boot_info.c keyboard.c speaker.c ata.c fs.c graphics.c basic.c kernel.c; do
+for f in uefi_boot64.c fbconsole.c klib.c boot_info.c keyboard.c speaker.c ata.c fs.c graphics.c interrupts.c basic.c kernel.c; do
     echo "    $f"
     $CC -c $CFLAGS "$f" -o "build-efi64/${f%.c}.o"
 done
@@ -43,6 +43,7 @@ ld -nostdlib -znocombreloc -T /usr/lib/elf_x86_64_efi.lds -shared \
     build-efi64/ata.o \
     build-efi64/fs.o \
     build-efi64/graphics.o \
+    build-efi64/interrupts.o \
     build-efi64/basic.o \
     build-efi64/kernel.o \
     -L /usr/lib -lefi -lgnuefi \

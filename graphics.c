@@ -16,11 +16,29 @@ static uint32_t  gfx_fb_height;
 static uint32_t  gfx_fb_pitch;
 static uint32_t  gfx_fb_bpp;
 
+/* Shadow (back) buffer — all drawing goes here, then copied to real FB */
+#define MAX_SHADOW_FB (1920 * 1200 * 4)
+static uint8_t shadow_fb[MAX_SHADOW_FB];
+static uint8_t *draw_buf;      /* points to shadow_fb in graphics mode */
+static uint32_t shadow_fb_size;
+
+/* Dirty region tracking — only copy changed rows */
+static uint32_t dirty_y0;
+static uint32_t dirty_y1;  /* exclusive */
+
+static void dirty_mark(uint32_t y0, uint32_t y1) {
+    if (y0 < dirty_y0) dirty_y0 = y0;
+    if (y1 > dirty_y1) dirty_y1 = y1;
+}
+
+static void dirty_reset(void) {
+    dirty_y0 = gfx_fb_height;
+    dirty_y1 = 0;
+}
+
 /* Virtual resolution (what BASIC programs see) */
 static uint32_t virt_width;
 static uint32_t virt_height;
-static uint32_t scale_x;  /* physical pixels per virtual pixel (x256 fixed point) */
-static uint32_t scale_y;
 
 /* Virtual resolution table */
 static const uint32_t mode_widths[]  = { 0, 320, 640, 800, 0 };
@@ -146,9 +164,6 @@ static void setup_virtual_res(int mode) {
         virt_width  = mode_widths[mode];
         virt_height = mode_heights[mode];
     }
-    /* Fixed-point scale factors (x256) */
-    scale_x = (gfx_fb_width  * 256) / virt_width;
-    scale_y = (gfx_fb_height * 256) / virt_height;
 }
 
 void gfx_set_mode(int mode) {
@@ -179,6 +194,13 @@ void gfx_set_mode(int mode) {
             gfx_fb_pitch  = 320;
             gfx_fb_bpp    = 1;
         }
+        /* Set up shadow buffer */
+        shadow_fb_size = gfx_fb_pitch * gfx_fb_height;
+        if (shadow_fb_size > MAX_SHADOW_FB)
+            shadow_fb_size = MAX_SHADOW_FB;
+        draw_buf = shadow_fb;
+        dirty_reset();
+
         setup_virtual_res(mode);
         current_mode = mode;
         draw_color = (gfx_fb_bpp == 4) ? vga_to_rgb32(15) : 15;
@@ -196,8 +218,10 @@ void gfx_set_mode(int mode) {
     } else if (mode == 0 && current_mode != 0) {
         /* Return to text */
         if (using_fb_console) {
+            asm volatile ("cli");
             if (saved_fb_size > 0)
                 memcpy(gfx_fb_addr, saved_fb, saved_fb_size);
+            asm volatile ("sti");
         } else {
             write_regs(mode03h_misc, mode03h_seq, 5, mode03h_crtc, 25,
                        mode03h_gc, 9, mode03h_ac, 21);
@@ -232,13 +256,10 @@ int gfx_height(void) {
 
 void gfx_clear(void) {
     if (current_mode < 1) return;
-    if (gfx_fb_bpp == 4) {
-        uint32_t *p = (uint32_t *)gfx_fb_addr;
-        for (uint32_t i = 0; i < gfx_fb_width * gfx_fb_height; i++)
-            p[i] = 0;
-    } else {
-        memset(gfx_fb_addr, 0, gfx_fb_width * gfx_fb_height);
-    }
+    memset(draw_buf, 0, shadow_fb_size);
+    dirty_y0 = 0;
+    dirty_y1 = gfx_fb_height;
+    gfx_present();
 }
 
 /* Standard VGA DAC palette — first 64 entries cover the most-used colors.
@@ -348,24 +369,22 @@ static void raw_pixel(uint32_t px, uint32_t py, uint32_t color) {
     if (px >= gfx_fb_width || py >= gfx_fb_height)
         return;
     if (gfx_fb_bpp == 4) {
-        uint32_t *p = (uint32_t *)(gfx_fb_addr + py * gfx_fb_pitch + px * 4);
+        uint32_t *p = (uint32_t *)(draw_buf + py * gfx_fb_pitch + px * 4);
         *p = color;
     } else {
-        gfx_fb_addr[py * gfx_fb_pitch + px] = (uint8_t)color;
+        draw_buf[py * gfx_fb_pitch + px] = (uint8_t)color;
     }
+    dirty_mark(py, py + 1);
 }
 
 void gfx_pixel(int x, int y, int color) {
     if (x < 0 || (uint32_t)x >= virt_width || y < 0 || (uint32_t)y >= virt_height)
         return;
 
-    /* Scale virtual coords to physical */
-    uint32_t px0 = (x * scale_x) >> 8;
-    uint32_t py0 = (y * scale_y) >> 8;
-    uint32_t px1 = ((x + 1) * scale_x) >> 8;
-    uint32_t py1 = ((y + 1) * scale_y) >> 8;
-
-    /* Fill the scaled pixel block */
+    uint32_t px0 = (x * gfx_fb_width) / virt_width;
+    uint32_t py0 = (y * gfx_fb_height) / virt_height;
+    uint32_t px1 = ((x + 1) * gfx_fb_width) / virt_width;
+    uint32_t py1 = ((y + 1) * gfx_fb_height) / virt_height;
     for (uint32_t py = py0; py < py1; py++)
         for (uint32_t px = px0; px < px1; px++)
             raw_pixel(px, py, color);
@@ -399,6 +418,13 @@ void gfx_drawto(int x1, int y1) {
 
     cursor_x = x1;
     cursor_y = y1;
+}
+
+void gfx_present(void) {
+    if (current_mode < 1 || !gfx_fb_addr || !shadow_fb_size) return;
+    if (dirty_y0 >= dirty_y1) return; /* nothing changed */
+    memcpy(gfx_fb_addr, draw_buf, shadow_fb_size);
+    dirty_reset();
 }
 
 void gfx_pos(int x, int y) {
