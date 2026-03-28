@@ -1,5 +1,6 @@
 #include "gpu.h"
 #include "bga.h"
+#include "vmware.h"
 #include "pat.h"
 #include "vga.h"
 
@@ -8,7 +9,7 @@ struct gpu_driver *gpu = 0;
 /* List of GPU drivers to probe, in order of preference */
 static struct gpu_driver *drivers[] = {
     &bga_gpu_driver,
-    /* future drivers go here */
+    &vmware_gpu_driver,
     0
 };
 

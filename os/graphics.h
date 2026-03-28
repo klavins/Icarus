@@ -2,11 +2,11 @@
 #define GRAPHICS_H
 
 /*
- * Graphics modes:
+ * Graphics modes (virtual resolution derived from physical by integer scaling):
  *   0 = text mode
- *   1 = 320x200 (chunky pixels, Atari-style)
- *   2 = 640x400
- *   3 = 800x600
+ *   1 = ~320px wide (chunky pixels, Atari-style)
+ *   2 = ~640px wide (medium)
+ *   3 = ~800px wide (high)
  *   4 = native resolution
  */
 void graphics_alloc_init(void);

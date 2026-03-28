@@ -1,5 +1,5 @@
 #include "graphics.h"
-#include "basic_internal.h"
+#include "os.h"
 #include "klib.h"
 #include "vga.h"
 #include "font_8x16.h"
@@ -16,14 +16,14 @@ static uint32_t  gfx_fb_width;
 static uint32_t  gfx_fb_height;
 static uint32_t  gfx_fb_pitch;
 
-/* Shadow (back) buffer — used when no page flipping is available */
+/* Shadow buffer — all drawing goes here */
 static uint8_t *shadow_fb;
-static uint8_t *draw_buf;      /* where drawing goes: shadow_fb or BGA back page */
+static uint8_t *draw_buf;      /* points to shadow_fb */
 static uint32_t shadow_fb_size;
 
-/* BGA page flipping state */
-static int use_page_flip;      /* 1 if BGA page flipping is active */
-static int draw_page;          /* which page we're drawing to (0 or 1) */
+/* GPU page flipping state */
+static int use_page_flip;      /* 1 if GPU page flipping is active */
+static int draw_page;          /* which GPU page the display is showing (0 or 1) */
 
 /* Dirty region tracking — only used for memcpy path (no page flip) */
 static uint32_t dirty_y0;
@@ -83,8 +83,8 @@ void graphics_alloc_init(void) {
     terminal_get_fb(&addr, &w, &h, &pitch, &bpp);
     if (addr && w > 0) {
         uint32_t size = pitch * h;
-        shadow_fb = basic_alloc(size);
-        saved_fb = basic_alloc(size);
+        shadow_fb = os_alloc(size);
+        saved_fb = os_alloc(size);
         shadow_fb_size = size;
         saved_fb_size = size;
         /* Initialize virtual resolution for text mode SCRW/SCRH */
@@ -154,6 +154,7 @@ void gfx_set_mode(int mode) {
         }
         if (use_page_flip && gpu)
             gpu->set_page(0);
+        gpu_update(0, 0, gfx_fb_width, gfx_fb_height);
         use_page_flip = 0;
         current_mode = 0;
         virt_width = gfx_fb_width;
@@ -365,6 +366,7 @@ void gfx_present(void) {
         uint32_t offset = dirty_y0 * gfx_fb_pitch;
         uint32_t bytes  = (dirty_y1 - dirty_y0) * gfx_fb_pitch;
         memcpy(gfx_fb_addr + offset, draw_buf + offset, bytes);
+        gpu_update(0, dirty_y0, gfx_fb_width, dirty_y1 - dirty_y0);
         dirty_reset();
     }
 }

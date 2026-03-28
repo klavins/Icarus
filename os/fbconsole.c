@@ -2,6 +2,7 @@
 #include "klib.h"
 #include "io.h"
 #include "font_8x16.h"
+#include "gpu.h"
 #include <stdarg.h>
 
 extern void *basic_alloc(size_t size);
@@ -102,11 +103,13 @@ static void fb_flush_region(uint32_t y0, uint32_t rows) {
     uint32_t offset = y0 * fb_pitch;
     uint32_t bytes  = rows * fb_pitch;
     memcpy(fb_addr + offset, fb_shadow + offset, bytes);
+    gpu_update(0, y0, fb_width, rows);
 }
 
 static void fb_flush_all(void) {
     if (!fb_shadow) return;
     memcpy(fb_addr, fb_shadow, fb_pitch * fb_height);
+    gpu_update(0, 0, fb_width, fb_height);
 }
 
 static void draw_cursor(int show) {

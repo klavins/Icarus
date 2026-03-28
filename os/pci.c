@@ -86,7 +86,7 @@ uint32_t pci_read_bar(uint8_t bus, uint8_t slot, uint8_t func, int bar) {
 
 void pci_enable_device(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t cmd = pci_read(bus, slot, func, 0x04);
-    cmd |= (1 << 1) | (1 << 2); /* memory space + bus master */
+    cmd |= (1 << 0) | (1 << 1) | (1 << 2); /* I/O space + memory space + bus master */
     pci_write(bus, slot, func, 0x04, cmd);
 }
 
