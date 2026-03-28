@@ -39,11 +39,11 @@ static void print_multiboot(struct multiboot_info *mboot) {
 
     if (mboot->flags & MBOOT_FLAG_LOADER)
         terminal_printf(" Boot loader: %s\n",
-                        (const char *)mboot->boot_loader_name);
+                        (const char *)(uintptr_t)mboot->boot_loader_name);
 
     if (mboot->flags & MBOOT_FLAG_CMDLINE)
         terminal_printf(" Command line: %s\n",
-                        (const char *)mboot->cmdline);
+                        (const char *)(uintptr_t)mboot->cmdline);
 
     if (mboot->flags & MBOOT_FLAG_BOOTDEV) {
         uint32_t bd = mboot->boot_device;

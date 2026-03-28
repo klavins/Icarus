@@ -5,15 +5,35 @@
 
 void *memset(void *dest, int val, size_t len) {
     unsigned char *p = dest;
-    while (len--)
+    /* Fill 8 bytes at a time using rep stosq */
+    uint64_t v8 = (unsigned char)val;
+    v8 |= v8 << 8;  v8 |= v8 << 16;  v8 |= v8 << 32;
+    size_t qwords = len / 8;
+    size_t tail = len % 8;
+    if (qwords) {
+        asm volatile ("rep stosq"
+            : "+D"(p), "+c"(qwords)
+            : "a"(v8)
+            : "memory");
+    }
+    while (tail--)
         *p++ = (unsigned char)val;
     return dest;
 }
 
 void *memcpy(void *dest, const void *src, size_t len) {
     unsigned char *d = dest;
-    const unsigned char *s = src;
-    while (len--)
+    const unsigned char *s = (const unsigned char *)src;
+    /* Copy 8 bytes at a time using rep movsq */
+    size_t qwords = len / 8;
+    size_t tail = len % 8;
+    if (qwords) {
+        asm volatile ("rep movsq"
+            : "+D"(d), "+S"(s), "+c"(qwords)
+            :
+            : "memory");
+    }
+    while (tail--)
         *d++ = *s++;
     return dest;
 }

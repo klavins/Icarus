@@ -4,11 +4,19 @@
 #include "font_8x16.h"
 #include <stdarg.h>
 
+extern void *basic_alloc(size_t size);
+
 #define FONT_W 8
 #define FONT_H 16
 
+/* Text scaling factor — set at init based on resolution */
+static int text_scale = 1;
+#define CELL_W (FONT_W * text_scale)
+#define CELL_H (FONT_H * text_scale)
+
 /* Framebuffer state — configured by terminal_init */
-static uint8_t *fb_addr;
+static uint8_t *fb_addr;      /* real (MMIO) framebuffer */
+static uint8_t *fb_shadow;    /* RAM shadow — all reads/writes go here */
 static uint32_t fb_width;
 static uint32_t fb_height;
 static uint32_t fb_pitch;   /* bytes per scan line */
@@ -75,63 +83,80 @@ static const uint8_t color8_map[16] = {
     56, 57, 58, 59, 60, 61, 62, 15,
 };
 
+/* Write to shadow buffer (fast RAM), not directly to MMIO framebuffer */
 static inline void fb_pixel(uint32_t x, uint32_t y, uint32_t color) {
+    uint8_t *buf = fb_shadow ? fb_shadow : fb_addr;
     if (x >= fb_width || y >= fb_height)
         return;
     if (fb_bpp == 4) {
-        uint32_t *p = (uint32_t *)(fb_addr + y * fb_pitch + x * 4);
+        uint32_t *p = (uint32_t *)(buf + y * fb_pitch + x * 4);
         *p = color;
     } else {
-        fb_addr[y * fb_pitch + x] = (uint8_t)color;
+        buf[y * fb_pitch + x] = (uint8_t)color;
     }
 }
 
+/* Flush a rectangular region from shadow to real framebuffer */
+static void fb_flush_region(uint32_t y0, uint32_t rows) {
+    if (!fb_shadow) return;
+    uint32_t offset = y0 * fb_pitch;
+    uint32_t bytes  = rows * fb_pitch;
+    memcpy(fb_addr + offset, fb_shadow + offset, bytes);
+}
+
+static void fb_flush_all(void) {
+    if (!fb_shadow) return;
+    memcpy(fb_addr, fb_shadow, fb_pitch * fb_height);
+}
+
 static void draw_cursor(int show) {
-    uint32_t x0 = cursor_col * FONT_W;
-    uint32_t y0 = cursor_row * FONT_H + FONT_H - 2; /* bottom 2 rows */
+    uint32_t x0 = cursor_col * CELL_W;
+    uint32_t y0 = cursor_row * CELL_H + CELL_H - 2 * text_scale;
     uint32_t color = show ? fg_color : bg_color;
-    for (int y = 0; y < 2; y++)
-        for (int x = 0; x < FONT_W; x++)
+    for (int y = 0; y < 2 * text_scale; y++)
+        for (int x = 0; x < CELL_W; x++)
             fb_pixel(x0 + x, y0 + y, color);
 }
 
 static void fb_draw_char(uint32_t col, uint32_t row, unsigned char ch,
                           uint32_t fg, uint32_t bg) {
-    uint32_t x0 = col * FONT_W;
-    uint32_t y0 = row * FONT_H;
+    uint32_t x0 = col * CELL_W;
+    uint32_t y0 = row * CELL_H;
     const uint8_t *glyph = (ch < 128) ? font_8x16[ch] : font_8x16[0];
 
     for (int y = 0; y < FONT_H; y++) {
         uint8_t bits = glyph[y];
         for (int x = 0; x < FONT_W; x++) {
             uint32_t color = (bits & (0x80 >> x)) ? fg : bg;
-            fb_pixel(x0 + x, y0 + y, color);
+            for (int sy = 0; sy < text_scale; sy++)
+                for (int sx = 0; sx < text_scale; sx++)
+                    fb_pixel(x0 + x * text_scale + sx,
+                             y0 + y * text_scale + sy, color);
         }
     }
 }
 
 static void fb_scroll(void) {
-    uint32_t row_bytes = fb_pitch * FONT_H;
-    uint32_t total = fb_pitch * (fb_height - FONT_H);
+    uint8_t *buf = fb_shadow ? fb_shadow : fb_addr;
+    uint32_t row_bytes = fb_pitch * CELL_H;
+    uint32_t total = fb_pitch * (fb_height - CELL_H);
 
-    /* Move everything up by one character row */
-    uint8_t *dst = fb_addr;
-    uint8_t *src = fb_addr + row_bytes;
-    for (uint32_t i = 0; i < total; i++)
-        dst[i] = src[i];
+    /* Move everything up by one character row (in fast RAM) */
+    memcpy(buf, buf + row_bytes, total);
 
     /* Clear last row */
+    uint8_t *last = buf + fb_pitch * (fb_height - CELL_H);
     if (fb_bpp == 4) {
-        uint32_t *last = (uint32_t *)(fb_addr + fb_pitch * (fb_height - FONT_H));
-        uint32_t pixels = fb_width * FONT_H;
+        uint32_t *p = (uint32_t *)last;
+        uint32_t pixels = fb_width * CELL_H;
         for (uint32_t i = 0; i < pixels; i++)
-            last[i] = bg_color;
+            p[i] = bg_color;
     } else {
-        uint8_t *last = fb_addr + fb_pitch * (fb_height - FONT_H);
-        uint32_t bytes = fb_pitch * FONT_H;
-        for (uint32_t i = 0; i < bytes; i++)
-            last[i] = (uint8_t)bg_color;
+        memset(last, (uint8_t)bg_color, fb_pitch * CELL_H);
     }
+
+    /* One write to the real framebuffer */
+    fb_flush_all();
 }
 
 /* Mode 13h register tables */
@@ -189,8 +214,14 @@ void terminal_init(void) {
         init_mode13h();
     }
 
-    fb_cols = fb_width / FONT_W;
-    fb_rows = fb_height / FONT_H;
+    /* Scale text 2x on high-res displays for readability */
+    text_scale = (fb_width >= 1280) ? 2 : 1;
+    fb_cols = fb_width / CELL_W;
+    fb_rows = fb_height / CELL_H;
+
+    /* Allocate RAM shadow buffer — avoids slow MMIO reads during scroll */
+    uint32_t fb_size = fb_pitch * fb_height;
+    fb_shadow = basic_alloc(fb_size);
 
     fg_color = (fb_bpp == 4) ? color32_map[VGA_WHITE] : color8_map[VGA_WHITE];
     bg_color = (fb_bpp == 4) ? color32_map[VGA_BLACK] : color8_map[VGA_BLACK];
@@ -217,18 +248,19 @@ void terminal_getcolor(int *fg, int *bg) {
 }
 
 void terminal_clear(void) {
+    uint8_t *buf = fb_shadow ? fb_shadow : fb_addr;
     if (fb_bpp == 4) {
-        uint32_t *p = (uint32_t *)fb_addr;
+        uint32_t *p = (uint32_t *)buf;
         uint32_t total = fb_width * fb_height;
         for (uint32_t i = 0; i < total; i++)
             p[i] = bg_color;
     } else {
-        for (uint32_t i = 0; i < fb_width * fb_height; i++)
-            fb_addr[i] = (uint8_t)bg_color;
+        memset(buf, (uint8_t)bg_color, fb_width * fb_height);
     }
     cursor_row = 0;
     cursor_col = 0;
     draw_cursor(1);
+    fb_flush_all();
 }
 
 void terminal_putchar(char c) {
@@ -239,26 +271,38 @@ void terminal_putchar(char c) {
             fb_draw_char(cursor_col, cursor_row, ' ', fg_color, bg_color);
         }
         draw_cursor(1);
+        fb_flush_region(cursor_row * CELL_H, CELL_H);
         return;
     }
     if (c == '\n') {
+        uint32_t old_row = cursor_row;
         cursor_col = 0;
         if (++cursor_row >= fb_rows) {
-            fb_scroll();
+            fb_scroll(); /* does its own flush_all */
             cursor_row = fb_rows - 1;
+        } else {
+            /* Flush old cursor row + new cursor row */
+            fb_flush_region(old_row * CELL_H, CELL_H);
+            fb_flush_region(cursor_row * CELL_H, CELL_H);
         }
         draw_cursor(1);
+        fb_flush_region(cursor_row * CELL_H, CELL_H);
         return;
     }
+    uint32_t char_row = cursor_row;
     fb_draw_char(cursor_col, cursor_row, (unsigned char)c, fg_color, bg_color);
     if (++cursor_col >= fb_cols) {
         cursor_col = 0;
         if (++cursor_row >= fb_rows) {
-            fb_scroll();
+            fb_scroll(); /* does its own flush_all */
             cursor_row = fb_rows - 1;
         }
     }
     draw_cursor(1);
+    /* Flush the row(s) we touched */
+    fb_flush_region(char_row * CELL_H, CELL_H);
+    if (cursor_row != char_row)
+        fb_flush_region(cursor_row * CELL_H, CELL_H);
 }
 
 void terminal_print(const char *s) {

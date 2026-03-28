@@ -39,6 +39,7 @@ void os_graphics_clear(void) { gfx_clear(); }
 void os_set_draw_color(int color) { gfx_set_color(color); }
 void os_plot(int x, int y) { gfx_plot(x, y); }
 void os_drawto(int x, int y) { gfx_drawto(x, y); }
+void os_fillto(int x, int y) { gfx_fillto(x, y); }
 void os_move_to(int x, int y) { gfx_pos(x, y); }
 void os_draw_text(const char *s) { gfx_text(s); }
 void os_present(void) { gfx_present(); }
@@ -106,8 +107,14 @@ uint32_t os_ticks(void) {
 /* ---- System ---- */
 
 void os_shutdown(void) {
+    /* Try ACPI shutdown (works in QEMU/Bochs) */
     outw(0x604, 0x2000);
     outw(0xB004, 0x2000);
     outw(0x4004, 0x3400);
-    asm volatile ("cli; hlt");
+
+    /* If still running, we're on real hardware — halt the CPU */
+    os_print("\n IT IS NOW SAFE TO TURN OFF YOUR COMPUTER.\n");
+    asm volatile ("cli");
+    for (;;)
+        asm volatile ("hlt");
 }

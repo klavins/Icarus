@@ -71,8 +71,13 @@ int fs_list(void) {
     /* Show free space */
     uint32_t next_free = find_free_sector(&hdr);
     uint32_t free_sectors = (total_sectors > next_free) ? total_sectors - next_free : 0;
-    terminal_printf("\n %d files, %d bytes free\n",
-                    hdr.file_count, free_sectors * SECTOR_SIZE);
+    uint32_t free_mb = free_sectors / 2048;  /* sectors / (1048576/512) */
+    if (free_mb >= 1024)
+        terminal_printf("\n %d files, %d GB free\n",
+                        hdr.file_count, free_mb / 1024);
+    else
+        terminal_printf("\n %d files, %d MB free\n",
+                        hdr.file_count, free_mb);
 
     return 0;
 }

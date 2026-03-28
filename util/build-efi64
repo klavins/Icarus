@@ -27,7 +27,7 @@ CFLAGS_NOSSE="$CFLAGS_BASE -mno-sse -mno-mmx -mno-sse2"
 mkdir -p build-efi64
 
 echo "==> Compiling (64-bit)..."
-for f in boot/uefi_boot64.c os/fbconsole.c lib/klib.c lib/math.c boot/boot_info.c os/keyboard.c os/speaker.c os/pci.c os/ahci.c os/ata.c os/fs.c os/graphics.c os/os.c basic/basic_vars.c basic/basic_token.c basic/basic_expr.c basic/basic_exec.c basic/basic.c boot/kernel.c; do
+for f in boot/uefi_boot64.c os/fbconsole.c lib/klib.c lib/math.c boot/boot_info.c os/keyboard.c os/speaker.c os/pci.c os/ahci.c os/ata.c os/fs.c os/pat.c os/graphics.c os/os.c basic/basic_vars.c basic/basic_token.c basic/basic_expr.c basic/basic_exec.c basic/basic.c boot/kernel.c; do
     base=$(basename "$f" .c)
     echo "    $f"
     $CC -c $CFLAGS "$f" -o "build-efi64/${base}.o"
@@ -49,6 +49,7 @@ ld -nostdlib -znocombreloc -T /usr/lib/elf_x86_64_efi.lds -shared \
     build-efi64/ahci.o \
     build-efi64/ata.o \
     build-efi64/fs.o \
+    build-efi64/pat.o \
     build-efi64/graphics.o \
     build-efi64/interrupts.o \
     build-efi64/math.o \

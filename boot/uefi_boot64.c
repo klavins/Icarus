@@ -66,6 +66,33 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         for (;;) ;
     }
 
+    /* Find the best resolution mode (highest, capped at 1920x1200 for readable text) */
+    {
+        UINTN numModes = gop->Mode->MaxMode;
+        UINTN bestMode = gop->Mode->Mode;  /* default to current */
+        UINTN bestPixels = 0;
+        for (UINTN m = 0; m < numModes; m++) {
+            EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info;
+            UINTN infoSize;
+            status = uefi_call_wrapper(gop->QueryMode, 4, gop, m, &infoSize, &info);
+            if (status != EFI_SUCCESS) continue;
+            if (info->PixelFormat == PixelBltOnly) continue;
+            UINTN w = info->HorizontalResolution;
+            UINTN h = info->VerticalResolution;
+            Print(L"  Mode %d: %dx%d\r\n", m, w, h);
+            if (w > 1920 || h > 1200) continue;
+            UINTN pixels = w * h;
+            if (pixels > bestPixels) {
+                bestPixels = pixels;
+                bestMode = m;
+            }
+        }
+        if (bestMode != gop->Mode->Mode) {
+            Print(L"Switching to mode %d...\r\n", bestMode);
+            uefi_call_wrapper(gop->SetMode, 2, gop, bestMode);
+        }
+    }
+
     Print(L"Display: %dx%d\r\n",
           gop->Mode->Info->HorizontalResolution,
           gop->Mode->Info->VerticalResolution);

@@ -4,6 +4,7 @@
 #include "klib.h"
 #include "vga.h"
 #include "font_8x16.h"
+#include "pat.h"
 
 static int current_mode;
 static uint32_t draw_color;
@@ -40,9 +41,13 @@ static void dirty_reset(void) {
 static uint32_t virt_width;
 static uint32_t virt_height;
 
-/* Virtual resolution table */
-static const uint32_t mode_widths[]  = { 0, 320, 640, 800, 0 };
-static const uint32_t mode_heights[] = { 0, 200, 400, 600, 0 };
+/* Uniform scaling: integer scale factor + centering offsets */
+static uint32_t pixel_scale;   /* integer scale factor (1, 2, 3, ...) */
+static uint32_t offset_x;     /* centering offset in physical pixels */
+static uint32_t offset_y;
+
+/* Target widths — used to pick an integer scale factor */
+static const uint32_t mode_target_width[] = { 0, 320, 640, 800, 0 };
 
 /* Is the console a framebuffer (UEFI) or VGA text? */
 static int using_fb_console;
@@ -155,14 +160,21 @@ static void restore_font(void) {
 /* ---- Public API ---- */
 
 static void setup_virtual_res(int mode) {
-    if (mode == 4 || mode_widths[mode] == 0) {
-        /* Native resolution */
+    if (mode == 4 || mode_target_width[mode] == 0) {
+        /* Native resolution — 1:1 mapping */
         virt_width  = gfx_fb_width;
         virt_height = gfx_fb_height;
+        pixel_scale = 1;
     } else {
-        virt_width  = mode_widths[mode];
-        virt_height = mode_heights[mode];
+        /* Derive scale from physical width / target width */
+        pixel_scale = gfx_fb_width / mode_target_width[mode];
+        if (pixel_scale < 1) pixel_scale = 1;
+        /* Virtual resolution = physical / scale — fills entire screen */
+        virt_width  = gfx_fb_width / pixel_scale;
+        virt_height = gfx_fb_height / pixel_scale;
     }
+    offset_x = 0;
+    offset_y = 0;
 }
 
 void graphics_alloc_init(void) {
@@ -175,6 +187,9 @@ void graphics_alloc_init(void) {
         saved_fb = basic_alloc(size);
         shadow_fb_size = size;
         saved_fb_size = size;
+        /* Enable Write-Combining for the framebuffer via PAT */
+        pat_init();
+        pat_set_write_combining((uint64_t)(uintptr_t)addr, size);
     }
 }
 
@@ -216,6 +231,7 @@ void gfx_set_mode(int mode) {
         cursor_x = 0;
         cursor_y = 0;
         gfx_clear();
+        gfx_present();
     } else if (mode >= 1 && current_mode >= 1) {
         /* Switching between graphics modes */
         setup_virtual_res(mode);
@@ -224,6 +240,7 @@ void gfx_set_mode(int mode) {
         cursor_x = 0;
         cursor_y = 0;
         gfx_clear();
+        gfx_present();
     } else if (mode == 0 && current_mode != 0) {
         /* Return to text */
         if (using_fb_console) {
@@ -271,7 +288,6 @@ void gfx_clear(void) {
     memset(draw_buf, 0, shadow_fb_size);
     dirty_y0 = 0;
     dirty_y1 = gfx_fb_height;
-    gfx_present();
 }
 
 /* Standard VGA DAC palette — first 64 entries cover the most-used colors.
@@ -393,12 +409,10 @@ void gfx_pixel(int x, int y, int color) {
     if (x < 0 || (uint32_t)x >= virt_width || y < 0 || (uint32_t)y >= virt_height)
         return;
 
-    uint32_t px0 = (x * gfx_fb_width) / virt_width;
-    uint32_t py0 = (y * gfx_fb_height) / virt_height;
-    uint32_t px1 = ((x + 1) * gfx_fb_width) / virt_width;
-    uint32_t py1 = ((y + 1) * gfx_fb_height) / virt_height;
-    for (uint32_t py = py0; py < py1; py++)
-        for (uint32_t px = px0; px < px1; px++)
+    uint32_t px0 = offset_x + x * pixel_scale;
+    uint32_t py0 = offset_y + y * pixel_scale;
+    for (uint32_t py = py0; py < py0 + pixel_scale; py++)
+        for (uint32_t px = px0; px < px0 + pixel_scale; px++)
             raw_pixel(px, py, color);
 }
 
@@ -432,10 +446,28 @@ void gfx_drawto(int x1, int y1) {
     cursor_y = y1;
 }
 
+void gfx_fillto(int x1, int y1) {
+    int x0 = cursor_x;
+    int y0 = cursor_y;
+    /* Sort coordinates */
+    int left   = (x0 < x1) ? x0 : x1;
+    int right  = (x0 > x1) ? x0 : x1;
+    int top    = (y0 < y1) ? y0 : y1;
+    int bottom = (y0 > y1) ? y0 : y1;
+    for (int y = top; y <= bottom; y++)
+        for (int x = left; x <= right; x++)
+            gfx_pixel(x, y, draw_color);
+    cursor_x = x1;
+    cursor_y = y1;
+}
+
 void gfx_present(void) {
     if (current_mode < 1 || !gfx_fb_addr || !shadow_fb_size) return;
     if (dirty_y0 >= dirty_y1) return; /* nothing changed */
-    memcpy(gfx_fb_addr, draw_buf, shadow_fb_size);
+    /* Only copy the dirty rows */
+    uint32_t offset = dirty_y0 * gfx_fb_pitch;
+    uint32_t bytes  = (dirty_y1 - dirty_y0) * gfx_fb_pitch;
+    memcpy(gfx_fb_addr + offset, draw_buf + offset, bytes);
     dirty_reset();
 }
 

@@ -18,6 +18,7 @@ void gfx_clear(void);
 void gfx_set_color(int color);
 void gfx_plot(int x, int y);
 void gfx_drawto(int x, int y);
+void gfx_fillto(int x, int y);
 void gfx_pixel(int x, int y, int color);
 void gfx_pos(int x, int y);
 void gfx_text(const char *str);

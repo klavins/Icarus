@@ -31,6 +31,7 @@ void os_graphics_clear(void);
 void os_set_draw_color(int color);
 void os_plot(int x, int y);
 void os_drawto(int x, int y);
+void os_fillto(int x, int y);
 void os_move_to(int x, int y);
 void os_draw_text(const char *s);
 void os_present(void);

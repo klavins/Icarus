@@ -372,7 +372,10 @@ void exec_tokens(struct token *t) {
         break;
 
     case TOK_CLS:
-        os_clear_screen();
+        if (os_graphics_get_mode() >= 1)
+            os_graphics_clear();
+        else
+            os_clear_screen();
         break;
 
     case TOK_POKE:
@@ -484,6 +487,12 @@ void exec_tokens(struct token *t) {
         t++;
         tok_pos = t;
         { int x, y; parse_xy(&x, &y); os_drawto(x, y); }
+        break;
+
+    case TOK_FILLTO:
+        t++;
+        tok_pos = t;
+        { int x, y; parse_xy(&x, &y); os_fillto(x, y); }
         break;
 
     case TOK_INPUT:
