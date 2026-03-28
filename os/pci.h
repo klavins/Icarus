@@ -11,6 +11,10 @@ void     pci_write(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint
 int pci_find_device(uint8_t class, uint8_t subclass,
                     uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func);
 
+/* Find a PCI device by vendor/device ID. Returns 1 if found, fills bus/slot/func. */
+int pci_find_vendor(uint16_t vendor, uint16_t device,
+                    uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func);
+
 /* Read a BAR (Base Address Register) */
 uint32_t pci_read_bar(uint8_t bus, uint8_t slot, uint8_t func, int bar);
 

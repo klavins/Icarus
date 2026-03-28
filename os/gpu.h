@@ -5,6 +5,8 @@
 
 struct gpu_driver {
     const char *name;
+    int      (*detect)(void);
+    void     (*init)(uint32_t width, uint32_t height);
     uint8_t *(*framebuffer)(void);
     uint32_t (*width)(void);
     uint32_t (*height)(void);

@@ -49,45 +49,23 @@ static uint16_t vbe_read(uint16_t reg) {
 }
 
 int bga_detect(void) {
-    /* Scan PCI for BGA device */
-    for (int bus = 0; bus < 256; bus++) {
-        for (int slot = 0; slot < 32; slot++) {
-            for (int func = 0; func < 8; func++) {
-                uint32_t id = pci_read(bus, slot, func, 0);
-                if ((id & 0xFFFF) == 0xFFFF) continue;
+    if (!pci_find_vendor(BGA_PCI_VENDOR, BGA_PCI_DEVICE,
+                         &bga_bus, &bga_slot, &bga_func))
+        return 0;
 
-                uint16_t vendor = id & 0xFFFF;
-                uint16_t device = (id >> 16) & 0xFFFF;
+    /* Verify VBE ID */
+    uint16_t ver = vbe_read(VBE_ID);
+    if (ver < 0xB0C0) return 0;
 
-                if (vendor == BGA_PCI_VENDOR && device == BGA_PCI_DEVICE) {
-                    bga_bus = bus;
-                    bga_slot = slot;
-                    bga_func = func;
+    /* Read framebuffer base from BAR0 */
+    uint32_t bar0 = pci_read_bar(bga_bus, bga_slot, bga_func, 0);
+    fb_base = (uint8_t *)(uintptr_t)(bar0 & 0xFFFFFFF0);
 
-                    /* Verify VBE ID */
-                    uint16_t ver = vbe_read(VBE_ID);
-                    if (ver < 0xB0C0) return 0;
-
-                    /* Read framebuffer base from BAR0 */
-                    uint32_t bar0 = pci_read_bar(bus, slot, func, 0);
-                    fb_base = (uint8_t *)(uintptr_t)(bar0 & 0xFFFFFFF0);
-
-                    detected = 1;
-                    terminal_printf(" BGA: v%x at %d:%d.%d fb=0x%x\n",
-                                    ver, bus, slot, func,
-                                    (uint32_t)(uintptr_t)fb_base);
-                    return 1;
-                }
-
-                if (func == 0) {
-                    uint32_t header = pci_read(bus, slot, 0, 0x0C);
-                    if (!((header >> 16) & 0x80))
-                        break;
-                }
-            }
-        }
-    }
-    return 0;
+    detected = 1;
+    terminal_printf(" BGA: v%x at %d:%d.%d fb=0x%x\n",
+                    ver, bga_bus, bga_slot, bga_func,
+                    (uint32_t)(uintptr_t)fb_base);
+    return 1;
 }
 
 void bga_init(uint32_t width, uint32_t height) {
@@ -160,6 +138,8 @@ uint8_t *bga_page_addr(int page) {
 
 struct gpu_driver bga_gpu_driver = {
     .name        = "BGA",
+    .detect      = bga_detect,
+    .init        = bga_init,
     .framebuffer = bga_framebuffer,
     .width       = bga_width,
     .height      = bga_height,

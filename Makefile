@@ -103,6 +103,20 @@ sim-uefi64: icarus-uefi64.img
 		-machine pcspk-audiodev=snd \
 		-audiodev coreaudio,id=snd,timer-period=1000,out.buffer-count=2
 
+sim-uefi64-nogpu: icarus-uefi64.img
+	cp $(OVMF_VARS) /tmp/ovmf-vars.fd
+	qemu-system-x86_64 \
+		-drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-x86_64-code.fd \
+		-drive if=pflash,format=raw,file=/tmp/ovmf-vars.fd \
+		-drive format=raw,file=icarus-uefi64.img,if=none,id=boot -device ide-hd,drive=boot,bus=ide.1 \
+		-device ahci,id=ahci0 \
+		-drive file=disk.img,format=raw,if=none,id=data -device ide-hd,drive=data,bus=ahci0.0 \
+		-vga none -device ramfb \
+		-m 256 -smp 1 -net none \
+		-display cocoa,zoom-to-fit=on -full-screen \
+		-machine pcspk-audiodev=snd \
+		-audiodev coreaudio,id=snd,timer-period=1000,out.buffer-count=2
+
 icarus-uefi64.img: $(SRCS)
 	./util/build-efi64
 

@@ -54,6 +54,32 @@ int pci_find_device(uint8_t class, uint8_t subclass,
     return 0;
 }
 
+int pci_find_vendor(uint16_t vendor, uint16_t device,
+                    uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func) {
+    for (int bus = 0; bus < 256; bus++) {
+        for (int slot = 0; slot < 32; slot++) {
+            for (int func = 0; func < 8; func++) {
+                uint32_t id = pci_read(bus, slot, func, 0);
+                if ((id & 0xFFFF) == 0xFFFF) continue;
+
+                if ((id & 0xFFFF) == vendor && ((id >> 16) & 0xFFFF) == device) {
+                    *out_bus = bus;
+                    *out_slot = slot;
+                    *out_func = func;
+                    return 1;
+                }
+
+                if (func == 0) {
+                    uint32_t header = pci_read(bus, slot, 0, 0x0C);
+                    if (!((header >> 16) & 0x80))
+                        break;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 uint32_t pci_read_bar(uint8_t bus, uint8_t slot, uint8_t func, int bar) {
     return pci_read(bus, slot, func, 0x10 + bar * 4);
 }

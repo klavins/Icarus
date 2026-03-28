@@ -11,6 +11,7 @@
 #include "interrupts.h"
 #include "pci.h"
 #include "gpu.h"
+#include "pat.h"
 
 #define LINE_MAX 80
 #define MBOOT_MAGIC 0x2BADB002
@@ -104,6 +105,7 @@ static void print_uefi_info(void) {
 void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
 
     basic_heap_init();
+    pat_init();
     terminal_init();
     if (magic == MBOOT_MAGIC)
         boot_info_print(magic, mboot);
@@ -115,6 +117,15 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
 
     pci_scan_print();
     gpu_init();
+
+    /* If no GPU driver took over, set up WC on the GOP framebuffer */
+    if (!gpu) {
+        uint8_t *fb;
+        uint32_t w, h, p, b;
+        terminal_get_fb(&fb, &w, &h, &p, &b);
+        if (fb)
+            pat_set_write_combining((uint64_t)(uintptr_t)fb, p * b * h);
+    }
     ata_init();
     print_disk_info();
     fs_init();

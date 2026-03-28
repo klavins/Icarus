@@ -1,10 +1,8 @@
 #include "graphics.h"
 #include "basic_internal.h"
-#include "io.h"
 #include "klib.h"
 #include "vga.h"
 #include "font_8x16.h"
-#include "pat.h"
 #include "gpu.h"
 
 static int current_mode;
@@ -12,12 +10,11 @@ static uint32_t draw_color;
 static int cursor_x;
 static int cursor_y;
 
-/* Physical framebuffer */
+/* Physical framebuffer (always 32bpp on UEFI) */
 static uint8_t  *gfx_fb_addr;
 static uint32_t  gfx_fb_width;
 static uint32_t  gfx_fb_height;
 static uint32_t  gfx_fb_pitch;
-static uint32_t  gfx_fb_bpp;
 
 /* Shadow (back) buffer — used when no page flipping is available */
 static uint8_t *shadow_fb;
@@ -54,113 +51,11 @@ static uint32_t offset_y;
 /* Target widths — used to pick an integer scale factor */
 static const uint32_t mode_target_width[] = { 0, 320, 640, 800, 0 };
 
-/* Is the console a framebuffer (UEFI) or VGA text? */
-static int using_fb_console;
-
 static uint32_t vga_to_rgb32(int color);
 
-/* ---- VGA Mode 13h support (BIOS boot only) ---- */
-
-#define VGA_FRAMEBUFFER ((volatile uint8_t *)0xA0000)
-#define VGA_TEXT_BUF    ((volatile uint16_t *)0xB8000)
-#define VGA_TEXT_SIZE   (80 * 25)
-
-static uint8_t  saved_font[256 * 32];
-static uint16_t saved_text[VGA_TEXT_SIZE];
-
-/* Saved framebuffer for UEFI mode */
+/* Saved framebuffer for restoring text screen after graphics mode */
 static uint8_t *saved_fb;
 static uint32_t saved_fb_size;
-
-/* VGA register tables for Mode 13h */
-static const uint8_t mode13h_misc = 0x63;
-static const uint8_t mode13h_seq[] = { 0x03, 0x01, 0x0F, 0x00, 0x0E };
-static const uint8_t mode13h_crtc[] = {
-    0x5F,0x4F,0x50,0x82,0x54,0x80,0xBF,0x1F,
-    0x00,0x41,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x9C,0x0E,0x8F,0x28,0x40,0x96,0xB9,0xA3,0xFF
-};
-static const uint8_t mode13h_gc[] = {
-    0x00,0x00,0x00,0x00,0x00,0x40,0x05,0x0F,0xFF
-};
-static const uint8_t mode13h_ac[] = {
-    0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
-    0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,
-    0x41,0x00,0x0F,0x00,0x00
-};
-
-/* Mode 03h register tables */
-static const uint8_t mode03h_misc = 0x67;
-static const uint8_t mode03h_seq[] = { 0x03, 0x00, 0x03, 0x00, 0x02 };
-static const uint8_t mode03h_crtc[] = {
-    0x5F,0x4F,0x50,0x82,0x55,0x81,0xBF,0x1F,
-    0x00,0x4F,0x0D,0x0E,0x00,0x00,0x00,0x50,
-    0x9C,0x0E,0x8F,0x28,0x1F,0x96,0xB9,0xA3,0xFF
-};
-static const uint8_t mode03h_gc[] = {
-    0x00,0x00,0x00,0x00,0x00,0x10,0x0E,0x00,0xFF
-};
-static const uint8_t mode03h_ac[] = {
-    0x00,0x01,0x02,0x03,0x04,0x05,0x14,0x07,
-    0x38,0x39,0x3A,0x3B,0x3C,0x3D,0x3E,0x3F,
-    0x0C,0x00,0x0F,0x08,0x00
-};
-
-#define VGA_SEQ_INDEX  0x3C4
-#define VGA_SEQ_DATA   0x3C5
-#define VGA_GC_INDEX   0x3CE
-#define VGA_GC_DATA    0x3CF
-#define VGA_CRTC_INDEX 0x3D4
-#define VGA_CRTC_DATA  0x3D5
-
-static void write_regs(uint8_t misc, const uint8_t *seq, int seq_count,
-                       const uint8_t *crtc, int crtc_count,
-                       const uint8_t *gc, int gc_count,
-                       const uint8_t *ac, int ac_count) {
-    outb(0x3C2, misc);
-    for (int i = 0; i < seq_count; i++) { outb(0x3C4, i); outb(0x3C5, seq[i]); }
-    outb(0x3D4, 0x03); outb(0x3D5, inb(0x3D5) | 0x80);
-    outb(0x3D4, 0x11); outb(0x3D5, inb(0x3D5) & ~0x80);
-    for (int i = 0; i < crtc_count; i++) { outb(0x3D4, i); outb(0x3D5, crtc[i]); }
-    for (int i = 0; i < gc_count; i++) { outb(0x3CE, i); outb(0x3CF, gc[i]); }
-    inb(0x3DA);
-    for (int i = 0; i < ac_count; i++) { outb(0x3C0, i); outb(0x3C0, ac[i]); }
-    outb(0x3C0, 0x20);
-}
-
-static void expose_plane2(void) {
-    outb(0x3C4, 0x00); outb(0x3C5, 0x01);
-    outb(0x3C4, 0x02); outb(0x3C5, 0x04);
-    outb(0x3C4, 0x04); outb(0x3C5, 0x07);
-    outb(0x3C4, 0x00); outb(0x3C5, 0x03);
-    outb(0x3CE, 0x04); outb(0x3CF, 0x02);
-    outb(0x3CE, 0x05); outb(0x3CF, 0x00);
-    outb(0x3CE, 0x06); outb(0x3CF, 0x00);
-}
-
-static void restore_text_access(void) {
-    outb(0x3C4, 0x00); outb(0x3C5, 0x01);
-    outb(0x3C4, 0x02); outb(0x3C5, 0x03);
-    outb(0x3C4, 0x04); outb(0x3C5, 0x03);
-    outb(0x3C4, 0x00); outb(0x3C5, 0x03);
-    outb(0x3CE, 0x04); outb(0x3CF, 0x00);
-    outb(0x3CE, 0x05); outb(0x3CF, 0x10);
-    outb(0x3CE, 0x06); outb(0x3CF, 0x0E);
-}
-
-static void save_font(void) {
-    expose_plane2();
-    volatile uint8_t *fm = (volatile uint8_t *)0xA0000;
-    for (int i = 0; i < 256 * 32; i++) saved_font[i] = fm[i];
-    restore_text_access();
-}
-
-static void restore_font(void) {
-    expose_plane2();
-    volatile uint8_t *fm = (volatile uint8_t *)0xA0000;
-    for (int i = 0; i < 256 * 32; i++) fm[i] = saved_font[i];
-    restore_text_access();
-}
 
 /* ---- Public API ---- */
 
@@ -184,51 +79,35 @@ static void setup_virtual_res(int mode) {
 
 void graphics_alloc_init(void) {
     uint8_t *addr;
-    uint32_t w, h, p, b;
-    terminal_get_fb(&addr, &w, &h, &p, &b);
+    uint32_t w, h, pitch, bpp;
+    terminal_get_fb(&addr, &w, &h, &pitch, &bpp);
     if (addr && w > 0) {
-        uint32_t size = p * b * h;  /* pitch_pixels * bpp * height = total bytes */
+        uint32_t size = pitch * h;
         shadow_fb = basic_alloc(size);
         saved_fb = basic_alloc(size);
         shadow_fb_size = size;
         saved_fb_size = size;
-        /* Enable Write-Combining for the framebuffer via PAT */
-        pat_init();
-        pat_set_write_combining((uint64_t)(uintptr_t)addr, size);
+        /* Initialize virtual resolution for text mode SCRW/SCRH */
+        virt_width = w;
+        virt_height = h;
     }
 }
 
 void gfx_set_mode(int mode) {
     if (mode < 0 || mode > 4) return;
 
-    /* Check if console is framebuffer-based */
-    terminal_get_fb(&gfx_fb_addr, &gfx_fb_width, &gfx_fb_height,
-                    &gfx_fb_pitch, &gfx_fb_bpp);
-    using_fb_console = (gfx_fb_addr != 0);
+    {
+        uint32_t bpp;
+        terminal_get_fb(&gfx_fb_addr, &gfx_fb_width, &gfx_fb_height,
+                        &gfx_fb_pitch, &bpp);
+    }
 
     if (mode >= 1 && current_mode == 0) {
         /* Entering graphics from text — save current screen */
-        if (gpu) {
-            /* GPU: text is on page 0, save it */
-            uint32_t needed = gfx_fb_pitch * gfx_fb_height;
-            if (saved_fb && needed <= saved_fb_size)
-                memcpy(saved_fb, gpu->page_addr(0), needed);
-        } else if (using_fb_console) {
-            uint32_t needed = gfx_fb_pitch * gfx_fb_height;
-            if (saved_fb && needed <= saved_fb_size)
-                memcpy(saved_fb, gfx_fb_addr, needed);
-        } else {
-            /* VGA text mode — save screen, switch to Mode 13h */
-            for (int i = 0; i < VGA_TEXT_SIZE; i++)
-                saved_text[i] = VGA_TEXT_BUF[i];
-            save_font();
-            write_regs(mode13h_misc, mode13h_seq, 5, mode13h_crtc, 25,
-                       mode13h_gc, 9, mode13h_ac, 21);
-            gfx_fb_addr   = (uint8_t *)0xA0000;
-            gfx_fb_width  = 320;
-            gfx_fb_height = 200;
-            gfx_fb_pitch  = 320;
-            gfx_fb_bpp    = 1;
+        uint32_t needed = gfx_fb_pitch * gfx_fb_height;
+        if (saved_fb && needed <= saved_fb_size) {
+            uint8_t *src = gpu ? gpu->page_addr(0) : gfx_fb_addr;
+            memcpy(saved_fb, src, needed);
         }
 
         /* Set up drawing target */
@@ -251,7 +130,7 @@ void gfx_set_mode(int mode) {
 
         setup_virtual_res(mode);
         current_mode = mode;
-        draw_color = (gfx_fb_bpp == 4) ? vga_to_rgb32(15) : 15;
+        draw_color = vga_to_rgb32(15);
         cursor_x = 0;
         cursor_y = 0;
         gfx_clear();
@@ -259,38 +138,26 @@ void gfx_set_mode(int mode) {
         /* Switching between graphics modes */
         setup_virtual_res(mode);
         current_mode = mode;
-        draw_color = (gfx_fb_bpp == 4) ? vga_to_rgb32(15) : 15;
+        draw_color = vga_to_rgb32(15);
         cursor_x = 0;
         cursor_y = 0;
         gfx_clear();
         gfx_present();
     } else if (mode == 0 && current_mode != 0) {
-        /* Return to text */
-        if (use_page_flip && gpu) {
-            /* Restore saved text screen to the display page */
-            if (saved_fb && saved_fb_size > 0) {
-                uint32_t needed = gfx_fb_pitch * gfx_fb_height;
-                if (needed <= saved_fb_size)
-                    memcpy(gpu->page_addr(0), saved_fb, needed);
+        /* Return to text — restore saved screen */
+        if (saved_fb && saved_fb_size > 0) {
+            uint32_t needed = gfx_fb_pitch * gfx_fb_height;
+            if (needed <= saved_fb_size) {
+                uint8_t *dst = gpu ? gpu->page_addr(0) : gfx_fb_addr;
+                memcpy(dst, saved_fb, needed);
             }
-            gpu->set_page(0);
-            use_page_flip = 0;
-        } else if (using_fb_console) {
-            asm volatile ("cli");
-            if (saved_fb && saved_fb_size > 0) {
-                uint32_t needed = gfx_fb_pitch * gfx_fb_height;
-                if (needed <= saved_fb_size)
-                    memcpy(gfx_fb_addr, saved_fb, needed);
-            }
-            asm volatile ("sti");
-        } else {
-            write_regs(mode03h_misc, mode03h_seq, 5, mode03h_crtc, 25,
-                       mode03h_gc, 9, mode03h_ac, 21);
-            restore_font();
-            for (int i = 0; i < VGA_TEXT_SIZE; i++)
-                VGA_TEXT_BUF[i] = saved_text[i];
         }
+        if (use_page_flip && gpu)
+            gpu->set_page(0);
+        use_page_flip = 0;
         current_mode = 0;
+        virt_width = gfx_fb_width;
+        virt_height = gfx_fb_height;
     }
 }
 
@@ -299,20 +166,11 @@ int gfx_get_mode(void) {
 }
 
 int gfx_width(void) {
-    if (current_mode >= 1) return virt_width;
-    /* In text mode, return the physical framebuffer size */
-    uint8_t *addr;
-    uint32_t w, h, p, b;
-    terminal_get_fb(&addr, &w, &h, &p, &b);
-    return w ? w : 320;
+    return virt_width;
 }
 
 int gfx_height(void) {
-    if (current_mode >= 1) return virt_height;
-    uint8_t *addr;
-    uint32_t w, h, p, b;
-    terminal_get_fb(&addr, &w, &h, &p, &b);
-    return h ? h : 200;
+    return virt_height;
 }
 
 void gfx_clear(void) {
@@ -421,22 +279,15 @@ static uint32_t vga_to_rgb32(int color) {
 }
 
 void gfx_set_color(int color) {
-    if (gfx_fb_bpp == 4)
-        draw_color = vga_to_rgb32(color);
-    else
-        draw_color = color;
+    draw_color = vga_to_rgb32(color);
 }
 
-/* Draw a single physical pixel (no scaling) */
+/* Draw a single physical pixel (no scaling, always 32bpp) */
 static void raw_pixel(uint32_t px, uint32_t py, uint32_t color) {
     if (px >= gfx_fb_width || py >= gfx_fb_height)
         return;
-    if (gfx_fb_bpp == 4) {
-        uint32_t *p = (uint32_t *)(draw_buf + py * gfx_fb_pitch + px * 4);
-        *p = color;
-    } else {
-        draw_buf[py * gfx_fb_pitch + px] = (uint8_t)color;
-    }
+    uint32_t *p = (uint32_t *)(draw_buf + py * gfx_fb_pitch + px * 4);
+    *p = color;
     if (!use_page_flip)
         dirty_mark(py, py + 1);
 }

@@ -5,25 +5,38 @@
 
 struct gpu_driver *gpu = 0;
 
+/* List of GPU drivers to probe, in order of preference */
+static struct gpu_driver *drivers[] = {
+    &bga_gpu_driver,
+    /* future drivers go here */
+    0
+};
+
 void gpu_init(void) {
-    /* Try each driver in order of preference */
-    if (bga_detect()) {
-        /* Get current resolution from terminal (set by GOP) */
-        uint8_t *addr;
-        uint32_t w, h, p, b;
-        terminal_get_fb(&addr, &w, &h, &p, &b);
+    /* Get current resolution from terminal (set by GOP) */
+    uint8_t *addr;
+    uint32_t w, h, p, b;
+    terminal_get_fb(&addr, &w, &h, &p, &b);
 
-        bga_init(w, h);
+    /* Try each driver until one works */
+    for (int i = 0; drivers[i]; i++) {
+        if (!drivers[i]->detect())
+            continue;
 
-        /* Set up write-combining for the BGA framebuffer */
-        pat_set_write_combining((uint64_t)(uintptr_t)bga_framebuffer(),
-                                bga_pitch() * bga_height() * 2);
+        drivers[i]->init(w, h);
 
-        /* Switch terminal to BGA framebuffer */
-        terminal_set_fb(bga_framebuffer(), bga_width(), bga_height(),
-                        bga_pitch(), 4);
+        /* Set up write-combining for the GPU framebuffer */
+        pat_set_write_combining(
+            (uint64_t)(uintptr_t)drivers[i]->framebuffer(),
+            drivers[i]->pitch() * drivers[i]->height() * 2);
 
-        gpu = &bga_gpu_driver;
+        /* Switch terminal to GPU framebuffer */
+        terminal_set_fb(drivers[i]->framebuffer(),
+                        drivers[i]->width(),
+                        drivers[i]->height(),
+                        drivers[i]->pitch(), 4);
+
+        gpu = drivers[i];
         terminal_printf(" Display: GOP -> %s\n", gpu->name);
         return;
     }
