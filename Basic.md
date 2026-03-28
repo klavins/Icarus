@@ -42,7 +42,16 @@ Arithmetic: `+`, `-`, `*`, `/`, `MOD`, `(`, `)`
 
 `MOD` returns the integer remainder. It has the same precedence as `*` and `/`. Operands are truncated to integers before the operation.
 
-Comparisons (used with IF): `=`, `<`, `>`, `<=`, `>=`, `<>`
+Comparisons: `=`, `<`, `>`, `<=`, `>=`, `<>`
+
+Logical: `AND`, `OR`, `NOT`
+
+    IF X > 0 AND X < 10 THEN PRINT "IN RANGE"
+    IF A = 1 OR B = 1 THEN PRINT "ONE IS SET"
+    IF NOT (X = 0) THEN PRINT "NONZERO"
+    IF (X > 0 AND X < 10) OR Y = 0 THEN GOTO 100
+
+Logical operators work on numeric values: zero is false, non-zero is true. Precedence from lowest to highest: `OR`, `AND`, `NOT`, comparisons, arithmetic. Parentheses override precedence.
 
 ### Built-in Functions
 
