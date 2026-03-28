@@ -90,6 +90,7 @@ size_t os_heap_free(void) { return basic_heap_free(); }
 /* ---- Timer ---- */
 
 void os_delay_ms(int ms) {
+    if (ms <= 0) return;
     volatile uint32_t *ticks = SYS_TICKS_PTR;
     uint32_t wait_ticks = (uint32_t)ms / 5;
     if (wait_ticks < 1) wait_ticks = 1;

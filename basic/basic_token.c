@@ -23,6 +23,7 @@ static enum token_type keyword_type(const char *word) {
     if (strcmp(word, "REM") == 0)   return TOK_REM;
     if (strcmp(word, "POKE") == 0)  return TOK_POKE;
     if (strcmp(word, "DELAY") == 0)   return TOK_DELAY;
+    if (strcmp(word, "SHOW") == 0)    return TOK_SHOW;
     if (strcmp(word, "PRINT") == 0) return TOK_PRINT;
     if (strcmp(word, "LET") == 0)   return TOK_LET;
     if (strcmp(word, "DIM") == 0)   return TOK_DIM;

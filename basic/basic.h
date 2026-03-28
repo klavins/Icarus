@@ -67,7 +67,8 @@ enum token_type {
     TOK_TEXT,
     TOK_REM,
     TOK_POKE,
-    TOK_DELAY
+    TOK_DELAY,
+    TOK_SHOW
 };
 
 struct token {

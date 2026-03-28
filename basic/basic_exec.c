@@ -386,14 +386,14 @@ void exec_tokens(struct token *t) {
         }
         break;
 
+    case TOK_SHOW:
+        os_present();
+        break;
+
     case TOK_DELAY:
         t++;
         tok_pos = t;
-        {
-            int n = parse_int();
-            os_present();
-            os_delay_ms(n);
-        }
+        os_delay_ms(parse_int());
         break;
 
     case TOK_DATA:
@@ -509,7 +509,6 @@ void exec_tokens(struct token *t) {
         break;
 
     case TOK_PAUSE:
-        os_present();
         os_read_key();
         break;
 

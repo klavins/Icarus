@@ -269,17 +269,31 @@ Built-in values that return the current screen width and height in pixels. In te
 
 ### DELAY
 
-Pause execution for a given number of milliseconds. In graphics mode, automatically presents the shadow buffer to the display before waiting.
+Pause execution for a given number of milliseconds.
 
     DELAY 16
     DELAY 1000
 
-For game loops, `DELAY 14` gives approximately 70 frames per second.
+### SHOW
+
+Update the display with everything drawn since the last SHOW. In graphics mode, all drawing goes to an invisible back buffer — SHOW copies it to the screen.
+
+    SHOW
+
+A typical game loop:
+
+    100 REM ... draw everything ...
+    110 SHOW
+    120 DELAY 16
+    130 GOTO 100
+
+For the fastest possible frame rate, use SHOW without DELAY.
 
 ### PAUSE
 
-Flush the display and wait for any keypress before continuing.
+Wait for any keypress before continuing.
 
+    SHOW
     PAUSE
 
 ### PEEK / POKE
