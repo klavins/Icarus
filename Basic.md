@@ -206,23 +206,25 @@ Examples:
     SOUND 0, 100, 0, 8
     SOUND 0, 0, 0, 0
 
-### GRAPHICS
+### GRAPHICS (GR)
 
-Switch video mode. Mode 0 returns to text mode and restores the previous screen contents. Drawing uses double buffering — all pixels go to a shadow buffer and are presented to the display automatically.
+Switch video mode. All mode switches clear the screen. `GR` is a shorthand alias.
 
     GRAPHICS 0
-    GRAPHICS 1
-    GRAPHICS 2
-    GRAPHICS 3
-    GRAPHICS 4
+    GR 1
+    GR 2
+    GR 3
+    GR 4
+    GR 5
 
-- 0 = text mode
-- 1 = 320x200 (chunky pixels, Atari-style)
-- 2 = 640x400 (medium resolution)
-- 3 = 800x600 (high resolution)
-- 4 = native resolution (whatever the display supports)
+- 0 = text mode (1x font, compact)
+- 1 = text mode (2x font, large)
+- 2 = ~320px wide (chunky pixels, Atari-style)
+- 3 = ~640px wide (medium resolution)
+- 4 = ~800px wide (high resolution)
+- 5 = native resolution (whatever the display supports)
 
-In UEFI mode, lower resolution modes scale up to fill the screen. In VGA mode, only mode 1 is available as a true hardware mode.
+Pixel graphics modes (2-5) use integer scaling to fill the screen with square pixels. The virtual resolution depends on your display. Drawing uses double buffering — all pixels go to a shadow buffer and are presented on SHOW.
 
 ### PLOT
 
@@ -239,6 +241,15 @@ Draw a line from the current graphics cursor to the given point.
     DRAWTO 100, 100
     DRAWTO 10, 100
     DRAWTO 10, 10
+
+### FILLTO
+
+Fill a rectangle from the current graphics cursor to the given point. Uses the current COLOR.
+
+    POS 10, 10
+    FILLTO 100, 100
+
+Useful for erasing regions in animation loops instead of clearing the entire screen.
 
 ### POS
 
@@ -428,18 +439,19 @@ Enter the Atari-style disk utility menu with options for Directory, Load, Save, 
 
 ### Graphics with Text
 
-    10 GRAPHICS 1
+    10 GR 2
     20 COLOR 14
     30 POS SCRW / 2 - 40, SCRH / 2
     40 TEXT "HELLO WORLD"
-    50 PAUSE
-    60 GRAPHICS 0
+    50 SHOW
+    60 PAUSE
+    70 GR 0
     RUN
 
 ### Real-time Input (Game Loop)
 
     10 POKE 458809, 0
-    20 GRAPHICS 1
+    20 GR 2
     30 LET X = 160
     40 LET Y = 100
     50 COLOR 15
@@ -452,7 +464,7 @@ Enter the Atari-style disk utility menu with options for Directory, Load, Save, 
     150 DELAY 14
     160 IF PEEK(458809) = 1 THEN GOTO 200
     170 GOTO 100
-    200 GRAPHICS 0
+    200 GR 0
     RUN
 
 ### Subroutines
@@ -480,7 +492,7 @@ Enter the Atari-style disk utility menu with options for Directory, Load, Save, 
 
 ### Circles with Trig
 
-    10 GRAPHICS 4
+    10 GR 5
     20 LET CX = SCRW / 2
     30 LET CY = SCRH / 2
     40 COLOR 14
@@ -489,8 +501,9 @@ Enter the Atari-style disk utility menu with options for Directory, Load, Save, 
     70 LET Y = CY + INT(200 * SIN(A))
     80 PLOT X, Y
     90 NEXT A
-    100 PAUSE
-    110 GRAPHICS 0
+    100 SHOW
+    110 PAUSE
+    120 GR 0
     RUN
 
 ## Host Disk Utility (idu)

@@ -217,8 +217,7 @@ void terminal_init(void) {
         init_mode13h();
     }
 
-    /* Scale text 2x on high-res displays for readability */
-    text_scale = (fb_width >= 1280) ? 2 : 1;
+    text_scale = 1;
     fb_cols = fb_width / CELL_W;
     fb_rows = fb_height / CELL_H;
 
@@ -346,8 +345,7 @@ void terminal_set_fb(uint8_t *addr, uint32_t width, uint32_t height,
     fb_pitch  = pitch;
     fb_bpp    = bpp;
 
-    /* Recalculate text grid */
-    text_scale = (fb_width >= 1280) ? 2 : 1;
+    /* Recalculate text grid — keep current scale */
     fb_cols = fb_width / CELL_W;
     fb_rows = fb_height / CELL_H;
 
@@ -362,5 +360,22 @@ void terminal_set_fb(uint8_t *addr, uint32_t width, uint32_t height,
         /* Resolution changed — need a new shadow buffer */
         fb_shadow = basic_alloc(fb_pitch * fb_height);
         terminal_clear();
+    }
+}
+
+void terminal_set_scale(int scale) {
+    if (scale < 1) scale = 1;
+    text_scale = scale;
+    fb_cols = fb_width / CELL_W;
+    fb_rows = fb_height / CELL_H;
+    if (cursor_row >= fb_rows) cursor_row = fb_rows - 1;
+    if (cursor_col >= fb_cols) cursor_col = fb_cols - 1;
+}
+
+void terminal_restore_shadow(const uint8_t *data, uint32_t size) {
+    if (fb_shadow) {
+        uint32_t max = fb_pitch * fb_height;
+        if (size > max) size = max;
+        memcpy(fb_shadow, data, size);
     }
 }

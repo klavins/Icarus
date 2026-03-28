@@ -31,4 +31,10 @@ void    terminal_get_fb(uint8_t **addr, uint32_t *width, uint32_t *height,
 void    terminal_set_fb(uint8_t *addr, uint32_t width, uint32_t height,
                         uint32_t pitch, uint32_t bpp);
 
+/* Set text scale factor (1 = 8x16, 2 = 16x32). */
+void    terminal_set_scale(int scale);
+
+/* Restore shadow buffer contents (e.g. when returning from graphics mode) */
+void    terminal_restore_shadow(const uint8_t *data, uint32_t size);
+
 #endif

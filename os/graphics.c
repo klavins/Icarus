@@ -48,8 +48,8 @@ static uint32_t pixel_scale;   /* integer scale factor (1, 2, 3, ...) */
 static uint32_t offset_x;     /* centering offset in physical pixels */
 static uint32_t offset_y;
 
-/* Target widths — used to pick an integer scale factor */
-static const uint32_t mode_target_width[] = { 0, 320, 640, 800, 0 };
+/* Target widths for pixel graphics modes 2-5 */
+static const uint32_t mode_target_width[] = { 0, 0, 320, 640, 800, 0 };
 
 static uint32_t vga_to_rgb32(int color);
 
@@ -60,7 +60,7 @@ static uint32_t saved_fb_size;
 /* ---- Public API ---- */
 
 static void setup_virtual_res(int mode) {
-    if (mode == 4 || mode_target_width[mode] == 0) {
+    if (mode == 5 || mode_target_width[mode] == 0) {
         /* Native resolution — 1:1 mapping */
         virt_width  = gfx_fb_width;
         virt_height = gfx_fb_height;
@@ -94,7 +94,7 @@ void graphics_alloc_init(void) {
 }
 
 void gfx_set_mode(int mode) {
-    if (mode < 0 || mode > 4) return;
+    if (mode < 0 || mode > 5) return;
 
     {
         uint32_t bpp;
@@ -102,8 +102,18 @@ void gfx_set_mode(int mode) {
                         &gfx_fb_pitch, &bpp);
     }
 
-    if (mode >= 1 && current_mode == 0) {
-        /* Entering graphics from text — save current screen */
+    int was_graphics = (current_mode >= 2);
+    int want_graphics = (mode >= 2);
+
+    if (mode <= 1 && !was_graphics) {
+        /* Switching between text modes (0=1x, 1=2x) */
+        terminal_set_scale(mode == 1 ? 2 : 1);
+        terminal_clear();
+        current_mode = mode;
+        virt_width = gfx_fb_width;
+        virt_height = gfx_fb_height;
+    } else if (want_graphics && !was_graphics) {
+        /* Entering pixel graphics from text — save current screen */
         uint32_t needed = gfx_fb_pitch * gfx_fb_height;
         if (saved_fb && needed <= saved_fb_size) {
             uint8_t *src = gpu ? gpu->page_addr(0) : gfx_fb_addr;
@@ -112,7 +122,6 @@ void gfx_set_mode(int mode) {
 
         /* Set up drawing target */
         if (gpu && gpu->can_flip() && shadow_fb) {
-            /* GPU page flipping: draw to shadow (fast RAM), copy+flip on SHOW */
             use_page_flip = 1;
             draw_page = 0;
             uint32_t page_size = gfx_fb_pitch * gfx_fb_height;
@@ -125,7 +134,7 @@ void gfx_set_mode(int mode) {
             draw_buf = shadow_fb;
             dirty_reset();
         } else {
-            return;  /* no buffer available */
+            return;
         }
 
         setup_virtual_res(mode);
@@ -134,8 +143,8 @@ void gfx_set_mode(int mode) {
         cursor_x = 0;
         cursor_y = 0;
         gfx_clear();
-    } else if (mode >= 1 && current_mode >= 1) {
-        /* Switching between graphics modes */
+    } else if (want_graphics && was_graphics) {
+        /* Switching between pixel graphics modes */
         setup_virtual_res(mode);
         current_mode = mode;
         draw_color = vga_to_rgb32(15);
@@ -143,20 +152,24 @@ void gfx_set_mode(int mode) {
         cursor_y = 0;
         gfx_clear();
         gfx_present();
-    } else if (mode == 0 && current_mode != 0) {
-        /* Return to text — restore saved screen */
+    } else if (mode <= 1 && was_graphics) {
+        /* Return to text from pixel graphics — restore saved screen */
+        use_page_flip = 0;
+        terminal_set_scale(mode == 1 ? 2 : 1);
         if (saved_fb && saved_fb_size > 0) {
             uint32_t needed = gfx_fb_pitch * gfx_fb_height;
             if (needed <= saved_fb_size) {
+                /* Restore to both the GPU/framebuffer and the terminal shadow */
                 uint8_t *dst = gpu ? gpu->page_addr(0) : gfx_fb_addr;
                 memcpy(dst, saved_fb, needed);
+                terminal_restore_shadow(saved_fb, needed);
             }
         }
-        if (use_page_flip && gpu)
+        if (gpu) {
             gpu->set_page(0);
-        gpu_update(0, 0, gfx_fb_width, gfx_fb_height);
-        use_page_flip = 0;
-        current_mode = 0;
+            gpu_update(0, 0, gfx_fb_width, gfx_fb_height);
+        }
+        current_mode = mode;
         virt_width = gfx_fb_width;
         virt_height = gfx_fb_height;
     }
@@ -175,7 +188,7 @@ int gfx_height(void) {
 }
 
 void gfx_clear(void) {
-    if (current_mode < 1 || !draw_buf) return;
+    if (current_mode < 2 || !draw_buf) return;
     uint32_t size = gfx_fb_pitch * gfx_fb_height;
     memset(draw_buf, 0, size);
     if (!use_page_flip) {
@@ -350,7 +363,7 @@ void gfx_fillto(int x1, int y1) {
 }
 
 void gfx_present(void) {
-    if (current_mode < 1) return;
+    if (current_mode < 2) return;
 
     if (use_page_flip && gpu) {
         /* Copy shadow buffer to the back page, then flip */

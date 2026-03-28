@@ -55,6 +55,7 @@ static enum token_type keyword_type(const char *word) {
     if (strcmp(word, "COLOR") == 0) return TOK_COLOR;
     if (strcmp(word, "SOUND") == 0)    return TOK_SOUND;
     if (strcmp(word, "GRAPHICS") == 0) return TOK_GRAPHICS;
+    if (strcmp(word, "GR") == 0)       return TOK_GRAPHICS;
     if (strcmp(word, "PLOT") == 0)     return TOK_PLOT;
     if (strcmp(word, "DRAWTO") == 0)   return TOK_DRAWTO;
     if (strcmp(word, "FILLTO") == 0)   return TOK_FILLTO;

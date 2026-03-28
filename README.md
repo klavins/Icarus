@@ -19,7 +19,7 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 
 - GPU driver framework with page flipping (BGA, VMware SVGA, GOP fallback)
 - PAT write-combining and shadow buffers for fast rendering
-- 4 graphics modes with integer scaling and square pixels
+- 6 display modes: 2 text scales + 4 pixel graphics with integer scaling and square pixels
 - AHCI SATA disk with simple flat filesystem
 - PCI bus scanning with pluggable driver model
 - Atari-inspired BASIC: floating point, trig, graphics, sound, PEEK/POKE, disk I/O
@@ -79,19 +79,6 @@ sync
 
 Then boot from the USB stick via the UEFI boot menu (usually F8, F12, or DEL at power-on).
 
-### Bootable ISO (for USB sticks, legacy BIOS PCs)
-
-```
-make docker-iso
-```
-
-Write to USB with:
-
-```
-diskutil unmountDisk /dev/diskN
-sudo dd if=icarus.iso of=/dev/rdiskN bs=1M
-```
-
 ## Disk Utility
 
 The `idu` tool manages files on the virtual disk image from the host.
@@ -113,22 +100,18 @@ dd if=/dev/zero of=disk.img bs=1M count=2
 idu format
 ```
 
-### Writing BASIC programs from the host
+### Writing BASIC programs to the virtual disk
 
-Create a text file with line numbers:
+Write all example programs at once:
 
 ```
-10 PRINT "HELLO WORLD"
-20 FOR I = 1 TO 10
-30 PRINT I
-40 NEXT I
+./util/write-examples
 ```
 
-Write it to disk and run:
+Or write individual files:
 
 ```
 idu write HELLO hello.bas
-make sim-bga
 ```
 
 Then in ICARUS:
@@ -180,11 +163,7 @@ For the full BASIC language reference, see [Basic.md](Basic.md).
 
 ## Running on Real Hardware
 
-### Legacy BIOS PC
-
-Any PC from before ~2015 with a VGA port and Legacy/CSM boot support will work. Dell Optiplex, HP ProDesk, and Lenovo ThinkCentre desktops from that era are ideal. Build the ISO with `make docker-iso` and write it to a USB stick.
-
-### Modern UEFI PC
+### UEFI PC
 
 Build a bootable USB with `./util/build-efi64` and `./util/make-usb-img`, then write `icarus-usb.img` to a USB stick. This produces a 64-bit UEFI application with a proper GPT partition table.
 

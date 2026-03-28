@@ -5,7 +5,7 @@
 50 REM   SIN, COS, and PI
 60 REM ========================
 70 REM
-100 GRAPHICS 4
+100 GRAPHICS 5
 110 LET CX = SCRW / 2
 120 LET CY = SCRH / 2
 130 REM

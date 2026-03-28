@@ -1,0 +1,10 @@
+#!/bin/bash
+# Write all .bas example programs to disk.img
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+IDU="$SCRIPT_DIR/idu"
+
+for f in "$PROJECT_DIR"/examples/*.bas; do
+    name=$(basename "$f" .bas | tr '[:lower:]' '[:upper:]')
+    "$IDU" write "$name" "$f"
+done

@@ -10,7 +10,7 @@
 60 LET G = 0.5
 70 LET KR = 0.8
 
-100 GRAPHICS 4
+100 GRAPHICS 5
 
 110 REM Erase old ball area
 120 COLOR 0

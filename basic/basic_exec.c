@@ -372,7 +372,7 @@ void exec_tokens(struct token *t) {
         break;
 
     case TOK_CLS:
-        if (gfx_get_mode() >= 1)
+        if (gfx_get_mode() >= 2)
             gfx_clear();
         else
             os_clear_screen();
@@ -448,7 +448,7 @@ void exec_tokens(struct token *t) {
         tok_pos = t;
         {
             int val = parse_int();
-            if (gfx_get_mode() >= 1) gfx_set_color(val);
+            if (gfx_get_mode() >= 2) gfx_set_color(val);
             else os_set_color(val, OS_BLACK);
         }
         break;
@@ -558,7 +558,7 @@ void run_program(void) {
 
     while (running && next_line_idx < program_count) {
         if (os_key_state(1)) {
-            if (gfx_get_mode() >= 1)
+            if (gfx_get_mode() >= 2)
                 gfx_set_mode(0);
             os_print("\n?BREAK\n");
             running = 0;
