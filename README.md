@@ -17,36 +17,12 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 
 ## Features
 
-### Operating System
-- 64-bit UEFI boot
-- GPU driver framework with BGA and VMware SVGA drivers
-- Page flipping for flicker-free graphics (BGA)
-- GOP framebuffer fallback for unsupported GPUs
-- PAT write-combining for fast framebuffer access
-- Framebuffer text console with shadow buffer and 2x scaling on high-res displays
-- Full-resolution pixel graphics with integer scaling (4 modes)
-- PS/2 keyboard input with shift support
-- PC speaker sound
-- AHCI SATA and ATA PIO disk drivers
-- PCI bus scanning and device detection
-- Simple flat filesystem with save/load/directory
-
-### BASIC Interpreter
-- Immediate mode and stored program execution
-- Line-number based program editing
-- Multi-character variable names
-- Double-precision floating point arithmetic with operator precedence and MOD
-- String variables (DIM and $)
-- 1D and 2D arrays
-- Built-in functions: RND, ABS, INT, SQR, SIN, COS, LEN, PEEK
-- Constants: PI, SCRW, SCRH
-- Hex number literals (0xFF)
-- Commands: PRINT, LET, DIM, IF/THEN, FOR/NEXT, GOTO, GOSUB/RETURN, ON GOTO/GOSUB, READ/DATA/RESTORE, INPUT, PAUSE, DELAY, POKE, REM
-- Graphics: GRAPHICS (4 resolution modes), PLOT, DRAWTO, FILLTO, COLOR, POS, TEXT, SHOW, CLS
-- Sound: SOUND (PC speaker, Atari BASIC syntax)
-- Disk: SAVE, LOAD, DIR, DELETE, FORMAT, DOS
-- Dynamic memory: bump allocator with watermark for program text, variables, and arrays
-- System: RUN, LIST, CLR, QUIT
+- GPU driver framework with page flipping (BGA, VMware SVGA, GOP fallback)
+- PAT write-combining and shadow buffers for fast rendering
+- 4 graphics modes with integer scaling and square pixels
+- AHCI SATA disk with simple flat filesystem
+- PCI bus scanning with pluggable driver model
+- Atari-inspired BASIC: floating point, trig, graphics, sound, PEEK/POKE, disk I/O
 
 ## Requirements
 
@@ -178,14 +154,15 @@ Address         Size        Description
                              +0x088  Uptime seconds (32-bit)
 0x00080000      ~100 bytes  UEFI boot info (framebuffer, memory, firmware, heap location)
 0x00090000      64 KB       Kernel stack
-0x00100000+     ~700 KB     Kernel code and data (loaded by UEFI)
-                             .text    Code (~200 KB)
-                             .rodata  String literals, font data, VGA palette (~50 KB)
+0x00100000+     ~760 KB     Kernel code and data (loaded by UEFI)
+                             .text    Code
+                             .rodata  String literals, font data, VGA palette
                              .data    Small initialized globals
-                             .bss     IDT, GDT, small static tables (~1 MB)
+                             .bss     IDT, GDT, small static tables
 0x01000000+     163+ MB     Kernel heap (bump allocator, size from UEFI memory map)
-                             Shadow framebuffer (allocated at boot, ~4 MB)
-                             Framebuffer save buffer (allocated at boot, ~4 MB)
+                             Text console shadow buffer (~3-9 MB depending on resolution)
+                             Graphics shadow buffer (same size)
+                             Graphics saved-screen buffer (same size)
                              ── watermark ── (CLR resets to here)
                              BASIC program text (allocated per line)
                              BASIC variables and arrays (allocated on DIM)
@@ -198,75 +175,6 @@ Address         Size        Description
 The system status area at `0x70000` is readable from BASIC via `PEEK`. The interrupt handler updates key state and timer ticks here in real time. See `sysinfo.h` for the full layout.
 
 Memory is managed by a bump allocator. The UEFI boot stub finds the largest free memory region (163 MB in QEMU with 256 MB RAM, much larger on real hardware). Framebuffer buffers are allocated first, then a watermark is set. BASIC data (program text, variables, arrays) is allocated above the watermark and freed on `CLR`. The `FREE` command (planned) will show remaining heap space.
-
-## Project Structure
-
-### Kernel
-| File | Description |
-|------|-------------|
-| `kernel.c` | Main kernel entry, BASIC REPL loop |
-| `boot_info.c/h` | Hardware detection (CPUID, memory, EFLAGS, ATA) |
-
-### Display
-| File | Description |
-|------|-------------|
-| `fbconsole.c` | Framebuffer text console with shadow buffer and 2x scaling |
-| `font_8x16.h` | 8x16 bitmap font for framebuffer rendering |
-| `graphics.c/h` | Pixel graphics with page flipping, integer scaling, and text overlay |
-| `gpu.c/h` | GPU driver abstraction — probes drivers, manages framebuffer handoff |
-| `bga.c/h` | Bochs Graphics Adapter driver — page flipping via Y offset |
-| `vmware.c/h` | VMware SVGA II driver — FIFO command submission |
-| `pat.c/h` | PAT write-combining for fast framebuffer writes |
-
-### Drivers
-| File | Description |
-|------|-------------|
-| `keyboard.c/h` | Interrupt-driven keyboard input via ring buffer |
-| `interrupts.c/h` | IDT, GDT, PIC setup; timer and keyboard ISRs |
-| `sysinfo.h` | System status area layout (key state, timer ticks) |
-| `speaker.c/h` | PC speaker tone generation |
-| `pci.c/h` | PCI bus scanning, device lookup by class or vendor/device ID |
-| `ahci.c/h` | AHCI SATA disk driver |
-| `ata.c/h` | Unified disk interface (AHCI with PIO fallback) |
-| `io.h` | Port I/O, MSR access (inb, outb, rdmsr, wrmsr) |
-| `math.c/h` | Freestanding math functions (sin, cos, sqrt) |
-
-### Filesystem
-| File | Description |
-|------|-------------|
-| `fs.c/h` | Simple flat filesystem (format, save, load, delete, list) |
-
-### BASIC Interpreter
-| File | Description |
-|------|-------------|
-| `basic.c/h` | Public API, program store, serialization, DOS menu |
-| `basic_internal.h` | Shared constants, structs, and internal function prototypes |
-| `basic_token.c` | Tokenizer and keyword lookup |
-| `basic_expr.c` | Expression parser, RNG, built-in functions |
-| `basic_exec.c` | Statement dispatcher (switch-based), runtime stacks |
-| `basic_vars.c` | Variable storage, bump allocator |
-
-### C Library
-| File | Description |
-|------|-------------|
-| `klib.c/h` | Freestanding libc: memset, memcpy, strlen, strcmp, sprintf, etc. |
-
-### UEFI Boot
-| File | Description |
-|------|-------------|
-| `uefi_boot.c` | 32-bit UEFI entry point (for QEMU i386) |
-| `uefi_boot64.c` | 64-bit UEFI entry point (for real hardware and QEMU x86_64) |
-| `uefi.h` | Minimal UEFI type definitions |
-| `uefi_stubs.c` | MinGW runtime stubs for freestanding build |
-| `Dockerfile.efi` | Docker image for UEFI cross-compilation |
-
-### Tools
-| File | Description |
-|------|-------------|
-| `util/idu` | Host-side disk image utility (Python) |
-| `util/build-efi` | 32-bit UEFI build script (runs in Docker) |
-| `util/build-efi64` | 64-bit UEFI build script (runs in Docker) |
-| `util/make-usb-img` | Create GPT-partitioned USB boot image |
 
 For the full BASIC language reference, see [Basic.md](Basic.md).
 
