@@ -26,8 +26,18 @@
 
 **[PIT](https://en.wikipedia.org/wiki/Intel_8253)** — Programmable Interval Timer (Intel 8253/8254). Hardware chip that generates periodic timer interrupts. Runs at 1,193,182 Hz divided by a programmable divisor. We set it to 200 Hz (5ms per tick). Drives the DELAY command for game timing, maintains the system tick counter readable via PEEK, and also controls the PC speaker frequency for the SOUND command.
 
+**[Paging](https://en.wikipedia.org/wiki/Memory_paging)** — The CPU's memory translation system. Every memory access goes through a 4-level page table (PML4 → PDPT → PD → PT) that maps virtual addresses to physical addresses in 4KB chunks called pages. Required in x86-64 mode. UEFI sets up an identity map (virtual = physical) before handing control to us. Each page table entry has flag bits that control permissions and caching behavior.
+
+**[PAT](https://en.wikipedia.org/wiki/Page_attribute_table)** — Page Attribute Table. The modern way to control memory caching types per-page via page table entries. An MSR holds 8 slots, each mapping to a memory type (WB, WC, UC, etc.). Three bits in each page table entry (PWT, PCD, PAT) select which slot to use. We replace slot 1 (normally Write-Through) with Write-Combining and set the corresponding bits on framebuffer pages. Works per-page with no alignment restrictions.
+
+**[PCI](https://en.wikipedia.org/wiki/Peripheral_Component_Interconnect)** — Peripheral Component Interconnect. The bus standard that connects devices (GPU, disk controller, network card) to the CPU. We scan the PCI bus to find the AHCI SATA controller. Each device has a config space accessible via I/O ports 0xCF8/0xCFC.
+
+**[TLB](https://en.wikipedia.org/wiki/Translation_lookaside_buffer)** — Translation Lookaside Buffer. A CPU cache of recent page table lookups. After modifying a page table entry, the TLB must be flushed with `invlpg` so the CPU sees the change. Without flushing, the CPU may continue using the old cached entry.
+
 **[UEFI](https://en.wikipedia.org/wiki/UEFI)** — Unified Extensible Firmware Interface. The modern replacement for BIOS. Provides boot services, graphics (GOP), memory maps, and loads PE executables from FAT32 partitions.
 - *QEMU:* [EDK II](https://en.wikipedia.org/wiki/TianoCore_EDK_II) (TianoCore) — Intel's open-source reference UEFI implementation, bundled with QEMU as OVMF firmware files.
 - *Real hardware:* [American Megatrends (AMI)](https://en.wikipedia.org/wiki/American_Megatrends) — Commercial UEFI firmware on the ASUS motherboard with AMD Ryzen 5 2600X.
 
 **[VGA](https://en.wikipedia.org/wiki/Video_Graphics_Array)** — Video Graphics Array. The legacy display standard from 1987. Text mode at 0xB8000 (80x25 characters) and Mode 13h at 0xA0000 (320x200 pixels). Not available on modern UEFI systems.
+
+**[Write-Combining (WC)](https://en.wikipedia.org/wiki/Write-combining)** — A CPU memory type designed for framebuffers and device memory. Without WC, each byte written to the framebuffer is sent individually across the PCIe bus (uncacheable). With WC, the CPU accumulates writes in internal 64-byte buffers and sends them in bursts — dramatically faster for sequential writes like memcpy. We enable WC on the framebuffer pages via PAT, which makes `gfx_present()` and text scrolling much faster on real hardware. UEFI firmware marks the framebuffer as uncacheable by default, and the page table entries are write-protected, so enabling WC requires clearing CR0.WP temporarily to modify them.
