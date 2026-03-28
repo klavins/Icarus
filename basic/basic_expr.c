@@ -37,8 +37,8 @@ static double parse_factor(void) {
         tok_pos++;
 
         /* Built-in values (no parentheses) */
-        if (strcmp(name, "SCRW") == 0) return (double)os_screen_width();
-        if (strcmp(name, "SCRH") == 0) return (double)os_screen_height();
+        if (strcmp(name, "SCRW") == 0) return (double)gfx_width();
+        if (strcmp(name, "SCRH") == 0) return (double)gfx_height();
         if (strcmp(name, "PI") == 0) return 3.14159265358979323846;
         if (strcmp(name, "RND") == 0 && tok_pos->type != TOK_LPAREN)
             return basic_rnd(0); /* RND without parens = 0.0-1.0 */

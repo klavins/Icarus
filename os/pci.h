@@ -17,4 +17,7 @@ uint32_t pci_read_bar(uint8_t bus, uint8_t slot, uint8_t func, int bar);
 /* Enable bus mastering and memory access for a device */
 void pci_enable_device(uint8_t bus, uint8_t slot, uint8_t func);
 
+/* Print all PCI devices found on the bus */
+void pci_scan_print(void);
+
 #endif

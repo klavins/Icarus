@@ -1,6 +1,5 @@
 #include "os.h"
 #include "vga.h"
-#include "graphics.h"
 #include "keyboard.h"
 #include "interrupts.h"
 #include "sysinfo.h"
@@ -28,21 +27,6 @@ void os_set_color(int fg, int bg) { terminal_setcolor(fg, bg); }
 void os_get_color(int *fg, int *bg) { terminal_getcolor(fg, bg); }
 void os_clear_screen(void) { terminal_clear(); }
 size_t os_cursor_col(void) { return terminal_getcol(); }
-
-/* ---- Graphics ---- */
-
-void os_graphics_mode(int mode) { gfx_set_mode(mode); }
-int  os_graphics_get_mode(void) { return gfx_get_mode(); }
-int  os_screen_width(void) { return gfx_width(); }
-int  os_screen_height(void) { return gfx_height(); }
-void os_graphics_clear(void) { gfx_clear(); }
-void os_set_draw_color(int color) { gfx_set_color(color); }
-void os_plot(int x, int y) { gfx_plot(x, y); }
-void os_drawto(int x, int y) { gfx_drawto(x, y); }
-void os_fillto(int x, int y) { gfx_fillto(x, y); }
-void os_move_to(int x, int y) { gfx_pos(x, y); }
-void os_draw_text(const char *s) { gfx_text(s); }
-void os_present(void) { gfx_present(); }
 
 /* ---- Input ---- */
 

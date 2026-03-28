@@ -3,6 +3,7 @@
 
 #include "basic.h"
 #include "os.h"
+#include "graphics.h"
 
 /* ---- Constants ---- */
 

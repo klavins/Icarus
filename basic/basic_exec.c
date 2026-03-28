@@ -372,8 +372,8 @@ void exec_tokens(struct token *t) {
         break;
 
     case TOK_CLS:
-        if (os_graphics_get_mode() >= 1)
-            os_graphics_clear();
+        if (gfx_get_mode() >= 1)
+            gfx_clear();
         else
             os_clear_screen();
         break;
@@ -390,7 +390,7 @@ void exec_tokens(struct token *t) {
         break;
 
     case TOK_SHOW:
-        os_present();
+        gfx_present();
         break;
 
     case TOK_DELAY:
@@ -448,7 +448,7 @@ void exec_tokens(struct token *t) {
         tok_pos = t;
         {
             int val = parse_int();
-            if (os_graphics_get_mode() >= 1) os_set_draw_color(val);
+            if (gfx_get_mode() >= 1) gfx_set_color(val);
             else os_set_color(val, OS_BLACK);
         }
         break;
@@ -474,25 +474,25 @@ void exec_tokens(struct token *t) {
     case TOK_GRAPHICS:
         t++;
         tok_pos = t;
-        os_graphics_mode(parse_int());
+        gfx_set_mode(parse_int());
         break;
 
     case TOK_PLOT:
         t++;
         tok_pos = t;
-        { int x, y; parse_xy(&x, &y); os_plot(x, y); }
+        { int x, y; parse_xy(&x, &y); gfx_plot(x, y); }
         break;
 
     case TOK_DRAWTO:
         t++;
         tok_pos = t;
-        { int x, y; parse_xy(&x, &y); os_drawto(x, y); }
+        { int x, y; parse_xy(&x, &y); gfx_drawto(x, y); }
         break;
 
     case TOK_FILLTO:
         t++;
         tok_pos = t;
-        { int x, y; parse_xy(&x, &y); os_fillto(x, y); }
+        { int x, y; parse_xy(&x, &y); gfx_fillto(x, y); }
         break;
 
     case TOK_INPUT:
@@ -524,21 +524,21 @@ void exec_tokens(struct token *t) {
     case TOK_POS:
         t++;
         tok_pos = t;
-        { int x, y; parse_xy(&x, &y); os_move_to(x, y); }
+        { int x, y; parse_xy(&x, &y); gfx_pos(x, y); }
         break;
 
     case TOK_TEXT:
         t++;
         if (t->type == TOK_STRING) {
-            os_draw_text(t->string_val);
+            gfx_text(t->string_val);
         } else if (t->type == TOK_STRIDENT) {
-            os_draw_text(strvar_get(t->string_val));
+            gfx_text(strvar_get(t->string_val));
         } else {
             tok_pos = t;
             double val = parse_expr();
             char buf[32];
             sprintf(buf, "%g", val);
-            os_draw_text(buf);
+            gfx_text(buf);
         }
         break;
 
@@ -558,8 +558,8 @@ void run_program(void) {
 
     while (running && next_line_idx < program_count) {
         if (os_key_state(1)) {
-            if (os_graphics_get_mode() >= 1)
-                os_graphics_mode(0);
+            if (gfx_get_mode() >= 1)
+                gfx_set_mode(0);
             os_print("\n?BREAK\n");
             running = 0;
             break;

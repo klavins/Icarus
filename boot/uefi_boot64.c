@@ -66,7 +66,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         for (;;) ;
     }
 
-    /* Find the best resolution mode (highest, capped at 1920x1200 for readable text) */
+    /* Find the best resolution mode (capped so BGA can double-buffer in 16MB VRAM) */
     {
         UINTN numModes = gop->Mode->MaxMode;
         UINTN bestMode = gop->Mode->Mode;  /* default to current */

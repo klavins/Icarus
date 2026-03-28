@@ -27,4 +27,8 @@ size_t terminal_getcol(void);
 void    terminal_get_fb(uint8_t **addr, uint32_t *width, uint32_t *height,
                         uint32_t *pitch, uint32_t *bpp);
 
+/* Switch to a new framebuffer (e.g. after BGA init). Redraws from shadow. */
+void    terminal_set_fb(uint8_t *addr, uint32_t width, uint32_t height,
+                        uint32_t pitch, uint32_t bpp);
+
 #endif

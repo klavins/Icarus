@@ -331,3 +331,33 @@ void terminal_get_fb(uint8_t **addr, uint32_t *width, uint32_t *height,
     *pitch  = fb_pitch;
     *bpp    = fb_bpp;
 }
+
+void terminal_set_fb(uint8_t *addr, uint32_t width, uint32_t height,
+                     uint32_t pitch, uint32_t bpp) {
+    int same_layout = (width == fb_width && height == fb_height &&
+                       pitch == fb_pitch && bpp == fb_bpp);
+
+    fb_addr   = addr;
+    fb_width  = width;
+    fb_height = height;
+    fb_pitch  = pitch;
+    fb_bpp    = bpp;
+
+    /* Recalculate text grid */
+    text_scale = (fb_width >= 1280) ? 2 : 1;
+    fb_cols = fb_width / CELL_W;
+    fb_rows = fb_height / CELL_H;
+
+    /* Update colors for new bpp */
+    fg_color = (fb_bpp == 4) ? color32_map[raw_fg] : color8_map[raw_fg];
+    bg_color = (fb_bpp == 4) ? color32_map[raw_bg] : color8_map[raw_bg];
+
+    if (same_layout && fb_shadow) {
+        /* Same resolution — just flush the shadow to the new framebuffer */
+        fb_flush_all();
+    } else {
+        /* Resolution changed — need a new shadow buffer */
+        fb_shadow = basic_alloc(fb_pitch * fb_height);
+        terminal_clear();
+    }
+}

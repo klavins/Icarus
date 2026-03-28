@@ -21,21 +21,6 @@ void os_get_color(int *fg, int *bg);
 void os_clear_screen(void);
 size_t os_cursor_col(void);
 
-/* ---- Graphics ---- */
-
-void os_graphics_mode(int mode);  /* 0=text, 1=320x200, 2=640x400, 3=800x600, 4=native */
-int  os_graphics_get_mode(void);
-int  os_screen_width(void);
-int  os_screen_height(void);
-void os_graphics_clear(void);
-void os_set_draw_color(int color);
-void os_plot(int x, int y);
-void os_drawto(int x, int y);
-void os_fillto(int x, int y);
-void os_move_to(int x, int y);
-void os_draw_text(const char *s);
-void os_present(void);
-
 /* ---- Input ---- */
 
 char os_read_key(void);           /* blocking — waits for keypress */

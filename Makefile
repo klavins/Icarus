@@ -97,6 +97,7 @@ sim-uefi64: icarus-uefi64.img
 		-drive format=raw,file=icarus-uefi64.img,if=none,id=boot -device ide-hd,drive=boot,bus=ide.1 \
 		-device ahci,id=ahci0 \
 		-drive file=disk.img,format=raw,if=none,id=data -device ide-hd,drive=data,bus=ahci0.0 \
+		-device VGA,vgamem_mb=32 \
 		-m 256 -smp 1 -net none \
 		-display cocoa,zoom-to-fit=on -full-screen \
 		-machine pcspk-audiodev=snd \

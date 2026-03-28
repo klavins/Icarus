@@ -9,6 +9,8 @@
 #include "fs.h"
 #include "ata.h"
 #include "interrupts.h"
+#include "pci.h"
+#include "gpu.h"
 
 #define LINE_MAX 80
 #define MBOOT_MAGIC 0x2BADB002
@@ -111,6 +113,8 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
     graphics_alloc_init();
     basic_alloc_set_watermark();
 
+    pci_scan_print();
+    gpu_init();
     ata_init();
     print_disk_info();
     fs_init();

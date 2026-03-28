@@ -5,6 +5,7 @@
 #include "vga.h"
 #include "font_8x16.h"
 #include "pat.h"
+#include "gpu.h"
 
 static int current_mode;
 static uint32_t draw_color;
@@ -18,12 +19,16 @@ static uint32_t  gfx_fb_height;
 static uint32_t  gfx_fb_pitch;
 static uint32_t  gfx_fb_bpp;
 
-/* Shadow (back) buffer — all drawing goes here, then copied to real FB */
+/* Shadow (back) buffer — used when no page flipping is available */
 static uint8_t *shadow_fb;
-static uint8_t *draw_buf;      /* points to shadow_fb in graphics mode */
+static uint8_t *draw_buf;      /* where drawing goes: shadow_fb or BGA back page */
 static uint32_t shadow_fb_size;
 
-/* Dirty region tracking — only copy changed rows */
+/* BGA page flipping state */
+static int use_page_flip;      /* 1 if BGA page flipping is active */
+static int draw_page;          /* which page we're drawing to (0 or 1) */
+
+/* Dirty region tracking — only used for memcpy path (no page flip) */
 static uint32_t dirty_y0;
 static uint32_t dirty_y1;  /* exclusive */
 
@@ -202,8 +207,13 @@ void gfx_set_mode(int mode) {
     using_fb_console = (gfx_fb_addr != 0);
 
     if (mode >= 1 && current_mode == 0) {
-        /* Entering graphics from text */
-        if (using_fb_console) {
+        /* Entering graphics from text — save current screen */
+        if (gpu) {
+            /* GPU: text is on page 0, save it */
+            uint32_t needed = gfx_fb_pitch * gfx_fb_height;
+            if (saved_fb && needed <= saved_fb_size)
+                memcpy(saved_fb, gpu->page_addr(0), needed);
+        } else if (using_fb_console) {
             uint32_t needed = gfx_fb_pitch * gfx_fb_height;
             if (saved_fb && needed <= saved_fb_size)
                 memcpy(saved_fb, gfx_fb_addr, needed);
@@ -220,10 +230,24 @@ void gfx_set_mode(int mode) {
             gfx_fb_pitch  = 320;
             gfx_fb_bpp    = 1;
         }
-        /* Set up shadow buffer */
-        if (!shadow_fb) return;  /* no buffer allocated */
-        draw_buf = shadow_fb;
-        dirty_reset();
+
+        /* Set up drawing target */
+        if (gpu && gpu->can_flip() && shadow_fb) {
+            /* GPU page flipping: draw to shadow (fast RAM), copy+flip on SHOW */
+            use_page_flip = 1;
+            draw_page = 0;
+            uint32_t page_size = gfx_fb_pitch * gfx_fb_height;
+            memset(gpu->page_addr(0), 0, page_size);
+            memset(gpu->page_addr(1), 0, page_size);
+            gpu->set_page(0);
+            draw_buf = shadow_fb;
+        } else if (shadow_fb) {
+            use_page_flip = 0;
+            draw_buf = shadow_fb;
+            dirty_reset();
+        } else {
+            return;  /* no buffer available */
+        }
 
         setup_virtual_res(mode);
         current_mode = mode;
@@ -231,7 +255,6 @@ void gfx_set_mode(int mode) {
         cursor_x = 0;
         cursor_y = 0;
         gfx_clear();
-        gfx_present();
     } else if (mode >= 1 && current_mode >= 1) {
         /* Switching between graphics modes */
         setup_virtual_res(mode);
@@ -243,7 +266,16 @@ void gfx_set_mode(int mode) {
         gfx_present();
     } else if (mode == 0 && current_mode != 0) {
         /* Return to text */
-        if (using_fb_console) {
+        if (use_page_flip && gpu) {
+            /* Restore saved text screen to the display page */
+            if (saved_fb && saved_fb_size > 0) {
+                uint32_t needed = gfx_fb_pitch * gfx_fb_height;
+                if (needed <= saved_fb_size)
+                    memcpy(gpu->page_addr(0), saved_fb, needed);
+            }
+            gpu->set_page(0);
+            use_page_flip = 0;
+        } else if (using_fb_console) {
             asm volatile ("cli");
             if (saved_fb && saved_fb_size > 0) {
                 uint32_t needed = gfx_fb_pitch * gfx_fb_height;
@@ -284,10 +316,13 @@ int gfx_height(void) {
 }
 
 void gfx_clear(void) {
-    if (current_mode < 1) return;
-    memset(draw_buf, 0, shadow_fb_size);
-    dirty_y0 = 0;
-    dirty_y1 = gfx_fb_height;
+    if (current_mode < 1 || !draw_buf) return;
+    uint32_t size = gfx_fb_pitch * gfx_fb_height;
+    memset(draw_buf, 0, size);
+    if (!use_page_flip) {
+        dirty_y0 = 0;
+        dirty_y1 = gfx_fb_height;
+    }
 }
 
 /* Standard VGA DAC palette — first 64 entries cover the most-used colors.
@@ -402,7 +437,8 @@ static void raw_pixel(uint32_t px, uint32_t py, uint32_t color) {
     } else {
         draw_buf[py * gfx_fb_pitch + px] = (uint8_t)color;
     }
-    dirty_mark(py, py + 1);
+    if (!use_page_flip)
+        dirty_mark(py, py + 1);
 }
 
 void gfx_pixel(int x, int y, int color) {
@@ -462,13 +498,24 @@ void gfx_fillto(int x1, int y1) {
 }
 
 void gfx_present(void) {
-    if (current_mode < 1 || !gfx_fb_addr || !shadow_fb_size) return;
-    if (dirty_y0 >= dirty_y1) return; /* nothing changed */
-    /* Only copy the dirty rows */
-    uint32_t offset = dirty_y0 * gfx_fb_pitch;
-    uint32_t bytes  = (dirty_y1 - dirty_y0) * gfx_fb_pitch;
-    memcpy(gfx_fb_addr + offset, draw_buf + offset, bytes);
-    dirty_reset();
+    if (current_mode < 1) return;
+
+    if (use_page_flip && gpu) {
+        /* Copy shadow buffer to the back page, then flip */
+        int back = 1 - draw_page;
+        uint32_t size = gfx_fb_pitch * gfx_fb_height;
+        memcpy(gpu->page_addr(back), shadow_fb, size);
+        gpu->set_page(back);
+        draw_page = back;
+    } else {
+        if (!gfx_fb_addr || !shadow_fb_size) return;
+        if (dirty_y0 >= dirty_y1) return; /* nothing changed */
+        /* Only copy the dirty rows */
+        uint32_t offset = dirty_y0 * gfx_fb_pitch;
+        uint32_t bytes  = (dirty_y1 - dirty_y0) * gfx_fb_pitch;
+        memcpy(gfx_fb_addr + offset, draw_buf + offset, bytes);
+        dirty_reset();
+    }
 }
 
 void gfx_pos(int x, int y) {
