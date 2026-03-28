@@ -26,6 +26,9 @@ static double basic_rnd(int n) {
     return (double)((rng_state >> 16) & 0x7FFF) / 32768.0;
 }
 
+/* Forward declaration — parentheses need the full condition parser */
+double parse_condition(void);
+
 static double parse_factor(void) {
     if (tok_pos->type == TOK_NUMBER) {
         double val = tok_pos->number_val;
@@ -121,7 +124,7 @@ static double parse_factor(void) {
     }
     if (tok_pos->type == TOK_LPAREN) {
         tok_pos++;
-        double val = parse_expr();
+        double val = parse_condition();
         if (tok_pos->type == TOK_RPAREN)
             tok_pos++;
         return val;
@@ -175,7 +178,7 @@ static int is_comparison(enum token_type t) {
            t == TOK_LE || t == TOK_GE || t == TOK_NE;
 }
 
-double parse_condition(void) {
+static double parse_comparison(void) {
     double left = parse_expr();
     if (!is_comparison(tok_pos->type))
         return left;
@@ -191,4 +194,32 @@ double parse_condition(void) {
     case TOK_NE:    return left != right ? 1.0 : 0.0;
     default:        return 0.0;
     }
+}
+
+static double parse_not(void) {
+    if (tok_pos->type == TOK_NOT) {
+        tok_pos++;
+        return parse_not() != 0.0 ? 0.0 : 1.0;
+    }
+    return parse_comparison();
+}
+
+static double parse_and(void) {
+    double val = parse_not();
+    while (tok_pos->type == TOK_AND) {
+        tok_pos++;
+        double right = parse_not();
+        val = (val != 0.0 && right != 0.0) ? 1.0 : 0.0;
+    }
+    return val;
+}
+
+double parse_condition(void) {
+    double val = parse_and();
+    while (tok_pos->type == TOK_OR) {
+        tok_pos++;
+        double right = parse_and();
+        val = (val != 0.0 || right != 0.0) ? 1.0 : 0.0;
+    }
+    return val;
 }

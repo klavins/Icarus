@@ -69,7 +69,10 @@ enum token_type {
     TOK_POKE,
     TOK_DELAY,
     TOK_SHOW,
-    TOK_FILLTO
+    TOK_FILLTO,
+    TOK_AND,
+    TOK_OR,
+    TOK_NOT
 };
 
 struct token {
