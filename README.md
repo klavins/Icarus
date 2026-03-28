@@ -1,6 +1,6 @@
 # ICARUS
 
-A bare-metal x86 operating system with a built-in BASIC interpreter, inspired by the Atari 800. Boots on both legacy BIOS and modern 64-bit UEFI systems. Tested on real hardware (AMD Ryzen 5 2600X, NVIDIA GPUs, American Megatrends UEFI).
+A bare-metal x86 operating system with a built-in BASIC interpreter, inspired by the Atari 800. Boots on 64-bit UEFI systems with GPU driver support. Tested on real hardware (AMD Ryzen 5 2600X, American Megatrends UEFI).
 
 ## What is this?
 
@@ -18,15 +18,17 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 ## Features
 
 ### Operating System
-- Boots via Multiboot (GRUB/QEMU), 32-bit UEFI, or 64-bit UEFI
-- 32-bit kernel for BIOS/Multiboot, 64-bit kernel for UEFI
-- VGA text mode (80x25) for BIOS boot
-- GOP framebuffer rendering with bitmap font for UEFI boot
-- VGA Mode 13h graphics (320x200, 256 colors) for BIOS boot
-- Full-resolution pixel graphics for UEFI boot
+- 64-bit UEFI boot
+- GPU driver framework with BGA and VMware SVGA drivers
+- Page flipping for flicker-free graphics (BGA)
+- GOP framebuffer fallback for unsupported GPUs
+- PAT write-combining for fast framebuffer access
+- Framebuffer text console with shadow buffer and 2x scaling on high-res displays
+- Full-resolution pixel graphics with integer scaling (4 modes)
 - PS/2 keyboard input with shift support
 - PC speaker sound
-- ATA PIO disk driver
+- AHCI SATA and ATA PIO disk drivers
+- PCI bus scanning and device detection
 - Simple flat filesystem with save/load/directory
 
 ### BASIC Interpreter
@@ -40,7 +42,7 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 - Constants: PI, SCRW, SCRH
 - Hex number literals (0xFF)
 - Commands: PRINT, LET, DIM, IF/THEN, FOR/NEXT, GOTO, GOSUB/RETURN, ON GOTO/GOSUB, READ/DATA/RESTORE, INPUT, PAUSE, DELAY, POKE, REM
-- Graphics: GRAPHICS (4 resolution modes), PLOT, DRAWTO, COLOR, POS, TEXT
+- Graphics: GRAPHICS (4 resolution modes), PLOT, DRAWTO, FILLTO, COLOR, POS, TEXT, SHOW, CLS
 - Sound: SOUND (PC speaker, Atari BASIC syntax)
 - Disk: SAVE, LOAD, DIR, DELETE, FORMAT, DOS
 - Dynamic memory: bump allocator with watermark for program text, variables, and arrays
@@ -48,57 +50,30 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 
 ## Requirements
 
-### For BIOS boot (make sim)
-- `nasm` (assembler)
-- `i686-elf-gcc` (cross-compiler)
-- `qemu-system-i386`
-
-### For UEFI boot (make sim-uefi / make sim-uefi64)
-- Everything above
 - Docker (for building the EFI binary)
+- `qemu-system-x86_64` (for simulation)
+- OVMF firmware (UEFI for QEMU, typically installed with QEMU)
 
 ### For real hardware (USB stick)
 - Everything above
 - A USB stick (any size)
 
-### Cross-compiler
-
-The `i686-elf-gcc` cross-compiler must be built from source or installed via your package manager. On macOS, follow the [OSDev GCC Cross-Compiler guide](https://wiki.osdev.org/GCC_Cross-Compiler).
-
 ## Building and Running
 
-### BIOS text mode (classic VGA)
-
-```
-make clean && make sim
-```
-
-### BIOS framebuffer mode (320x200 pixel rendering)
-
-```
-make clean && make sim-fb
-```
-
-### UEFI mode — 32-bit (for QEMU i386)
-
-First build the Docker image (one time):
-
-```
-docker build --platform linux/amd64 -t icarus-efi -f Dockerfile.efi .
-```
-
-Then build and run:
-
-```
-./util/build-efi
-make sim-uefi
-```
-
-### UEFI mode — 64-bit (for QEMU x86_64 and real hardware)
+Build the EFI binary (runs in Docker):
 
 ```
 ./util/build-efi64
-make sim-uefi64
+```
+
+### Simulation
+
+Three GPU configurations are available:
+
+```
+make sim-bga       # Bochs Graphics Adapter — page flipping, no shimmer
+make sim-vmware    # VMware SVGA — FIFO command submission
+make sim-gop       # No GPU driver — GOP framebuffer fallback
 ```
 
 ### Bootable USB stick (64-bit UEFI, for real hardware)
@@ -177,7 +152,7 @@ Write it to disk and run:
 
 ```
 idu write HELLO hello.bas
-make sim-uefi
+make sim-bga
 ```
 
 Then in ICARUS:
@@ -215,9 +190,9 @@ Address         Size        Description
                              BASIC program text (allocated per line)
                              BASIC variables and arrays (allocated on DIM)
                              BASIC string variable data (allocated on DIM)
-0xFD000000+     ~4 MB       GOP framebuffer (address varies, provided by UEFI)
-                             1280x800x4 bytes on our test hardware
-                             Written by gfx_present() from shadow buffer
+0xFD000000+     varies      GPU framebuffer (address from PCI BAR or GOP)
+                             Marked write-combining via PAT
+                             Page-flipped (BGA) or update-rect (VMware)
 ```
 
 The system status area at `0x70000` is readable from BASIC via `PEEK`. The interrupt handler updates key state and timer ticks here in real time. See `sysinfo.h` for the full layout.
@@ -235,9 +210,13 @@ Memory is managed by a bump allocator. The UEFI boot stub finds the largest free
 ### Display
 | File | Description |
 |------|-------------|
-| `fbconsole.c` | Framebuffer text renderer (UEFI GOP) |
+| `fbconsole.c` | Framebuffer text console with shadow buffer and 2x scaling |
 | `font_8x16.h` | 8x16 bitmap font for framebuffer rendering |
-| `graphics.c/h` | Pixel graphics with double buffering, scaling, and text overlay |
+| `graphics.c/h` | Pixel graphics with page flipping, integer scaling, and text overlay |
+| `gpu.c/h` | GPU driver abstraction — probes drivers, manages framebuffer handoff |
+| `bga.c/h` | Bochs Graphics Adapter driver — page flipping via Y offset |
+| `vmware.c/h` | VMware SVGA II driver — FIFO command submission |
+| `pat.c/h` | PAT write-combining for fast framebuffer writes |
 
 ### Drivers
 | File | Description |
@@ -246,8 +225,10 @@ Memory is managed by a bump allocator. The UEFI boot stub finds the largest free
 | `interrupts.c/h` | IDT, GDT, PIC setup; timer and keyboard ISRs |
 | `sysinfo.h` | System status area layout (key state, timer ticks) |
 | `speaker.c/h` | PC speaker tone generation |
-| `ata.c/h` | ATA PIO disk read/write with timeouts |
-| `io.h` | Port I/O functions (inb, outb, inw, outw) |
+| `pci.c/h` | PCI bus scanning, device lookup by class or vendor/device ID |
+| `ahci.c/h` | AHCI SATA disk driver |
+| `ata.c/h` | Unified disk interface (AHCI with PIO fallback) |
+| `io.h` | Port I/O, MSR access (inb, outb, rdmsr, wrmsr) |
 | `math.c/h` | Freestanding math functions (sin, cos, sqrt) |
 
 ### Filesystem
@@ -300,15 +281,16 @@ Any PC from before ~2015 with a VGA port and Legacy/CSM boot support will work. 
 Build a bootable USB with `./util/build-efi64` and `./util/make-usb-img`, then write `icarus-usb.img` to a USB stick. This produces a 64-bit UEFI application with a proper GPT partition table.
 
 Successfully tested on:
-- AMD Ryzen 5 2600X / ASUS motherboard / NVIDIA GPUs / American Megatrends UEFI
-- Display: 1024x768 via GOP framebuffer
+- AMD Ryzen 5 2600X / ASUS motherboard / American Megatrends UEFI
+- Display via GOP framebuffer (no NVIDIA driver yet)
+- AHCI SATA disk (1TB WDC)
 - 64GB RAM detected
 
 ### Hardware Notes
 
 - **Keyboard**: A PS/2 keyboard is required. USB keyboards rely on UEFI PS/2 emulation which stops working after ExitBootServices. Most ASUS and similar motherboards have a PS/2 port on the back panel.
-- **Display**: ICARUS uses the UEFI GOP framebuffer. On multi-GPU systems, make sure your monitor is connected to the GPU marked as `boot_vga` (check with `cat /sys/bus/pci/devices/*/boot_vga` from Linux).
-- **Disk**: The ATA PIO driver works with legacy PATA/IDE drives and QEMU virtual disks. SATA and NVMe drives on real hardware are not yet supported — BASIC works fine without a disk, you just can't save/load programs.
+- **Display**: ICARUS probes PCI for a supported GPU (BGA, VMware SVGA) and falls back to the UEFI GOP framebuffer. On real hardware without a supported GPU driver, GOP provides basic display output. On multi-GPU systems, make sure your monitor is connected to the GPU marked as `boot_vga` (check with `cat /sys/bus/pci/devices/*/boot_vga` from Linux).
+- **Disk**: The AHCI SATA driver works with modern SATA controllers. Falls back to ATA PIO for legacy/QEMU configurations. NVMe is not yet supported.
 - **BIOS Setup**: If you can't enter BIOS setup, try clearing CMOS by removing the motherboard coin battery for 30 seconds with power disconnected.
 
 ## Documentation
