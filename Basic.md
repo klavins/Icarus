@@ -1,17 +1,17 @@
 # ICARUS BASIC Reference
 
-ICARUS BASIC is a BASIC interpreter running on the ICARUS OS, a bare-metal x86 kernel. It boots on both legacy BIOS and modern 64-bit UEFI systems. Inspired by Atari BASIC.
+ICARUS BASIC is a BASIC interpreter running on the ICARUS OS, a bare-metal x86 kernel. Boots on 64-bit UEFI systems. Inspired by Atari BASIC.
 
 ## Getting Started
 
 Build and run in QEMU:
 
-    make sim-uefi64
+    make sim-vmware
 
 The system boots, displays hardware info, and drops into the BASIC prompt:
 
-    ICARUS BASIC
-     >
+    ICARUS OS
+    >
 
 Commands can be entered directly (immediate mode) or stored as numbered lines (program mode).
 
