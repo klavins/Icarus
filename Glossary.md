@@ -38,6 +38,24 @@
 - *QEMU:* [EDK II](https://en.wikipedia.org/wiki/TianoCore_EDK_II) (TianoCore) — Intel's open-source reference UEFI implementation, bundled with QEMU as OVMF firmware files.
 - *Real hardware:* [American Megatrends (AMI)](https://en.wikipedia.org/wiki/American_Megatrends) — Commercial UEFI firmware on the ASUS motherboard with AMD Ryzen 5 2600X.
 
+**BAR** — Base Address Register. A PCI concept — each device has up to 6 BARs that tell the system where the device's memory regions are mapped in the CPU's address space. On the GTX 1650, BAR0 maps MMIO control registers (16MB) and BAR1 maps a window into VRAM (256MB). BAR1 uses identity mapping on TU117 — no GPU page tables needed.
+
+**DMA** — Direct Memory Access. Hardware reads or writes memory on its own, without the CPU doing each byte. The opposite of PIO (Programmed I/O). The NVIDIA window channel is a DMA channel — the display engine's DMA fetcher reads push buffer commands from VRAM independently. DMA channels require the full display engine init and instance memory to function.
+
+**[EVO](https://nouveau.freedesktop.org/EVO.html)** — Evolution. NVIDIA's display engine command interface. The CPU writes method commands to a push buffer in VRAM, and the display engine firmware reads and executes them. Used for mode setting, surface configuration, and page flipping. Turing uses the NVDisplay variant with classes NVC57D (core) and NVC57E (window).
+
+**[MMIO](https://en.wikipedia.org/wiki/Memory-mapped_I/O)** — Memory-Mapped I/O. Device registers accessed by reading/writing memory addresses instead of using I/O port instructions. The GPU's control registers are at BAR0 (0xF5000000 on our hardware). Every register read/write goes across the PCIe bus to the GPU.
+
+**[MTRR](https://en.wikipedia.org/wiki/Memory_type_range_register)** — Memory Type Range Registers. CPU registers that control caching behavior for physical address ranges. The firmware uses them to mark RAM as write-back and everything else as uncacheable. MTRRs override PAT — if an MTRR says UC, PAT cannot promote to WC. On our Ryzen, BAR1 falls in the UC default region, preventing write-combining for full-frame GPU writes. We cannot modify MTRRs on this system (crashes).
+
+**[PCIe](https://en.wikipedia.org/wiki/PCI_Express)** — PCI Express. The serial bus connecting the GPU to the CPU. All BAR0/BAR1 accesses go across PCIe. Without write-combining, each byte written to BAR1 is a separate PCIe transaction (~20MB/s). With WC, writes are batched into 64-byte bursts (~1GB/s).
+
+**Push Buffer** — A region of VRAM where the CPU writes display commands for the GPU to execute. Each command is a header word (opcode, count, method offset) followed by data words. The CPU advances a PUT pointer to trigger execution; the GPU advances a GET pointer as it processes commands. On TU117, the core channel uses old NV50-style headers, while window channels use opcode 2 (bit 30) headers.
+
+**[RAMHT](https://nouveau.freedesktop.org/RAMHT.html)** — RAM Hash Table. A lookup table in VRAM that maps 32-bit handles to GPU objects (DMA contexts). When the window channel executes SET_CONTEXT_DMA_ISO, the display engine hashes the handle to find the DMA context in the RAMHT. Required for the window channel to access framebuffer memory. Entries are 8 bytes: handle + context word (inst_offset << 9).
+
+**[VRAM](https://en.wikipedia.org/wiki/Video_RAM)** — Video RAM. The GPU's private memory (4GB on GTX 1650). The CPU accesses it through BAR1 (identity-mapped) or the GOP address (0xF1000000, with write-combining from UEFI). The display engine scans it directly for pixel output. Push buffers, instance memory, RAMHT, and framebuffer pages all live in VRAM.
+
 **[VGA](https://en.wikipedia.org/wiki/Video_Graphics_Array)** — Video Graphics Array. The legacy display standard from 1987. Text mode at 0xB8000 (80x25 characters) and Mode 13h at 0xA0000 (320x200 pixels). Not available on modern UEFI systems.
 
 **[Write-Combining (WC)](https://en.wikipedia.org/wiki/Write-combining)** — A CPU memory type designed for framebuffers and device memory. Without WC, each byte written to the framebuffer is sent individually across the PCIe bus (uncacheable). With WC, the CPU accumulates writes in internal 64-byte buffers and sends them in bursts — dramatically faster for sequential writes like memcpy. We enable WC on the framebuffer pages via PAT, which makes `gfx_present()` and text scrolling much faster on real hardware. UEFI firmware marks the framebuffer as uncacheable by default, and the page table entries are write-protected, so enabling WC requires clearing CR0.WP temporarily to modify them.

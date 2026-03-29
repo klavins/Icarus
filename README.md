@@ -17,7 +17,7 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 
 ## Features
 
-- GPU driver framework with page flipping (BGA, VMware SVGA, GOP fallback)
+- GPU drivers: NVIDIA (EVO display engine), BGA (page flipping), VMware SVGA, GOP fallback
 - PAT write-combining and shadow buffers for fast rendering
 - 6 display modes: 2 text scales + 4 pixel graphics with integer scaling and square pixels
 - AHCI SATA disk with simple flat filesystem
@@ -150,9 +150,9 @@ Address         Size        Description
                              BASIC program text (allocated per line)
                              BASIC variables and arrays (allocated on DIM)
                              BASIC string variable data (allocated on DIM)
-0xFD000000+     varies      GPU framebuffer (address from PCI BAR or GOP)
-                             Marked write-combining via PAT
-                             Page-flipped (BGA) or update-rect (VMware)
+0xE0000000+     256 MB      GPU BAR1 (NVIDIA VRAM window, UC)
+0xF1000000      ~5 MB       GOP framebuffer (NVIDIA VRAM via UEFI, WC)
+                             Used for all CPU framebuffer writes
 ```
 
 The system status area at `0x70000` is readable from BASIC via `PEEK`. The interrupt handler updates key state and timer ticks here in real time. See `sysinfo.h` for the full layout.
@@ -169,14 +169,14 @@ Build a bootable USB with `./util/build-efi64` and `./util/make-usb-img`, then w
 
 Successfully tested on:
 - AMD Ryzen 5 2600X / ASUS motherboard / American Megatrends UEFI
-- Display via GOP framebuffer (no NVIDIA driver yet)
+- NVIDIA GeForce GTX 1650 (TU117) — EVO display engine driver
 - AHCI SATA disk (1TB WDC)
 - 64GB RAM detected
 
 ### Hardware Notes
 
 - **Keyboard**: A PS/2 keyboard is required. USB keyboards rely on UEFI PS/2 emulation which stops working after ExitBootServices. Most ASUS and similar motherboards have a PS/2 port on the back panel.
-- **Display**: ICARUS probes PCI for a supported GPU (BGA, VMware SVGA) and falls back to the UEFI GOP framebuffer. On real hardware without a supported GPU driver, GOP provides basic display output. On multi-GPU systems, make sure your monitor is connected to the GPU marked as `boot_vga` (check with `cat /sys/bus/pci/devices/*/boot_vga` from Linux).
+- **Display**: ICARUS probes PCI for a supported GPU. On NVIDIA GTX 1650 (TU117), it initializes the EVO display engine with core and window channels. On QEMU, BGA and VMware SVGA drivers provide page flipping. Falls back to UEFI GOP framebuffer on unsupported GPUs.
 - **Disk**: The AHCI SATA driver works with modern SATA controllers. Falls back to ATA PIO for legacy/QEMU configurations. NVMe is not yet supported.
 - **BIOS Setup**: If you can't enter BIOS setup, try clearing CMOS by removing the motherboard coin battery for 30 seconds with power disconnected.
 

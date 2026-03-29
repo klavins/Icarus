@@ -115,7 +115,6 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
     graphics_alloc_init();
     basic_alloc_set_watermark();
 
-    pci_scan_print();
     gpu_init();
 
     /* If no GPU driver took over, set up WC on the GOP framebuffer */
@@ -132,8 +131,9 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
     nvidia_save_dump();
     interrupts_init();
     basic_init();
+    terminal_setcolor(VGA_LGRAY, VGA_BLACK);
+    terminal_printf(" ICARUS OS v%d\n", OS_VERSION);
     terminal_setcolor(VGA_WHITE, VGA_BLACK);
-    terminal_print("\n WELCOME TO ICARUS BASIC\n");
     terminal_print(" > ");
 
     char line[LINE_MAX];

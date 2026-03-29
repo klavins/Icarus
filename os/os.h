@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define OS_VERSION 11
+
 /* ---- Display (text mode) ---- */
 
 void os_print(const char *s);
