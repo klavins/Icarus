@@ -1,0 +1,21 @@
+#!/bin/bash
+# Quick-update USB stick with latest EFI binary.
+# Rebuilds the FAT boot image and writes it directly.
+# Usage: ./util/update-usb diskN  (e.g., disk6)
+set -e
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 diskN  (e.g., disk6)"
+    exit 1
+fi
+
+if [ ! -f build-efi64/BOOTX64.EFI ]; then
+    echo "Error: build-efi64/BOOTX64.EFI not found. Run ./util/build-efi64 first."
+    exit 1
+fi
+
+DISK="/dev/r$1"
+
+diskutil unmountDisk "/dev/$1" 2>/dev/null || true
+sudo dd if=icarus-uefi64.img of="$DISK" bs=1M
+echo "Updated."

@@ -129,6 +129,7 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
     ata_init();
     print_disk_info();
     fs_init();
+    nvidia_save_dump();
     interrupts_init();
     basic_init();
     terminal_setcolor(VGA_WHITE, VGA_BLACK);

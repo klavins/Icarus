@@ -9,3 +9,6 @@ build-efi/
 build-efi64/
 .claude/
 .vscode/
+notes.txt
+nvidia.md
+notes/

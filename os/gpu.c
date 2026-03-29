@@ -1,4 +1,5 @@
 #include "gpu.h"
+#include "nvidia.h"
 #include "bga.h"
 #include "vmware.h"
 #include "pat.h"
@@ -8,6 +9,7 @@ struct gpu_driver *gpu = 0;
 
 /* List of GPU drivers to probe, in order of preference */
 static struct gpu_driver *drivers[] = {
+    &nvidia_gpu_driver,
     &bga_gpu_driver,
     &vmware_gpu_driver,
     0
@@ -25,6 +27,10 @@ void gpu_init(void) {
             continue;
 
         drivers[i]->init(w, h);
+
+        /* Only take over display if the driver provides a framebuffer */
+        if (!drivers[i]->framebuffer())
+            continue;
 
         /* Set up write-combining for the GPU framebuffer */
         pat_set_write_combining(
