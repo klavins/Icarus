@@ -1,8 +1,7 @@
 #include "nvidia.h"
 #include "gpu.h"
 #include "pci.h"
-#include "pat.h"
-#include "io.h"
+/* pat.h and io.h not directly needed — PAT WC is set by gpu_init */
 #include "vga.h"
 #include "klib.h"
 
@@ -23,7 +22,7 @@ static const uint16_t known_devices[] = {
 
 #define NV_PMC_BOOT_0            0x000000
 #define NV_PMC_ENABLE            0x000200
-#define NV_BAR1_INST             0xB80F40
+/* NV_BAR1_INST (0xB80F40) — reads as 0 on TU117 (identity mapping) */
 
 #define NV_PDISP_INST_TARGET     0x610010
 #define NV_PDISP_INST_ADDR       0x610014
@@ -86,7 +85,7 @@ static const uint16_t known_devices[] = {
 #define WIN_SET_SIZE_OUT         0x02A4
 #define WIN_SET_PRESENT_CONTROL  0x0308
 
-/* WIMM channel methods (NVC37B) */
+/* WIMM channel methods (NVC37B) — currently unused, kept for future use */
 #define WIMM_SET_POINT_OUT       0x0208
 #define WIMM_UPDATE              0x0200
 
@@ -97,7 +96,7 @@ static const uint16_t known_devices[] = {
 #define PAGE1_VRAM       0x500000
 #define CORE_PB_VRAM     0xA00000
 #define WIN_PB_VRAM      0xA01000
-#define WIMM_PB_VRAM     0xA02000
+#define WIMM_PB_VRAM     0xA02000  /* currently unused */
 #define DISP_INST_VRAM   0xA10000
 #define DISP_INST_SIZE   0x10000
 #define DMA_CTX_OFFSET   0x2000
@@ -150,6 +149,7 @@ static void core_wait(void) {
         if ((nv_rd32(NV_PDISP_CORE_STAT) & 0x000F0000) == 0x00040000) break;
 }
 
+/* Currently unused — EVO page flipping is dormant (see nvidia_can_flip) */
 static void win_push(uint32_t method, uint32_t data) {
     uint32_t off = win_pb_put / 4;
     win_pb[off + 0] = WIN_HDR(1, method);
@@ -157,6 +157,7 @@ static void win_push(uint32_t method, uint32_t data) {
     win_pb_put += 8;
 }
 
+/* Currently unused — EVO page flipping is dormant */
 static void win_push_multi(uint32_t base_method, const uint32_t *data, int count) {
     uint32_t off = win_pb_put / 4;
     win_pb[off] = WIN_HDR(count, base_method);
@@ -165,11 +166,13 @@ static void win_push_multi(uint32_t base_method, const uint32_t *data, int count
     win_pb_put += 4 + count * 4;
 }
 
+/* Currently unused — EVO page flipping is dormant */
 static void win_kick(void) {
     asm volatile ("sfence" ::: "memory");
     nv_wr32(NV_PDISP_WIN_PUT(0), win_pb_put >> 2);
 }
 
+/* Currently unused — EVO page flipping is dormant */
 static void win_wait(void) {
     for (int i = 0; i < 200000; i++)
         if ((nv_rd32(NV_PDISP_WIN_STAT(0)) & 0x000F0000) == 0x00040000) break;
@@ -354,7 +357,7 @@ static void window_bounds(void) {
     core_wait();
 }
 
-/* ---- Surface configuration ---- */
+/* ---- Surface configuration — currently unused, EVO page flipping is dormant ---- */
 
 static int surface_set(uint32_t vram_offset) {
     uint32_t w = gop_width;
@@ -384,7 +387,7 @@ static int surface_set(uint32_t vram_offset) {
     return ((nv_rd32(NV_PDISP_WIN_STAT(0)) >> 16) & 0xF) == 4;
 }
 
-/* ---- Page flip ---- */
+/* ---- Page flip — currently unused, EVO page flipping is dormant ---- */
 
 static void nvidia_flip(int page) {
     uint32_t offset = page ? PAGE1_VRAM : PAGE0_VRAM;
@@ -444,11 +447,6 @@ void nvidia_init(uint32_t width, uint32_t height) {
         gop_height = h;
         gop_pitch = p;
     }
-
-    /* PAT WC on BAR1 — MTRR default is UC which may override PAT.
-     * We don't program MTRRs (crashes on Ryzen). If BAR1 writes are slow,
-     * the MTRR UC default is the cause and needs BIOS/UEFI configuration. */
-    pat_set_write_combining((uint64_t)(uintptr_t)fb_bar, fb_bar_size);
 
     /* Display engine init */
     disp_engine_init();

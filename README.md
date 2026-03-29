@@ -1,19 +1,21 @@
 # ICARUS
 
-A bare-metal x86 operating system with a built-in BASIC interpreter, inspired by the Atari 800. Boots on 64-bit UEFI systems with GPU driver support. Tested on real hardware (AMD Ryzen 5 2600X, American Megatrends UEFI).
+Icarus is a bare-metal x86 operating system with a built-in BASIC interpreter. It boots on 64-bit UEFI systems with some GPU driver support. It has been tested on real hardware (AMD Ryzen 5 2600X, American Megatrends UEFI, GTX 1650).
 
 ## What is this?
 
-ICARUS boots directly on PC hardware (or in QEMU) with no underlying operating system. It provides a BASIC programming environment reminiscent of home computers from the early 1980s, complete with graphics, sound, and disk storage.
+ICARUS boots directly on PC hardware or in QEMU with no underlying operating system. It provides a BASIC programming environment reminiscent of home computers from the early 1980s, complete with graphics, sound, and disk storage.
 
 When you power on, you get a prompt:
 
 ```
-ICARUS BASIC
+ ICARUS OS
  >
 ```
 
-Type BASIC commands, write programs, save them to disk, and draw graphics.
+You can type BASIC commands, write programs, save them to disk, and draw graphics.
+
+For the full BASIC language reference, see [Basic.md](Basic.md).
 
 ## Features
 
@@ -26,17 +28,14 @@ Type BASIC commands, write programs, save them to disk, and draw graphics.
 
 ## Requirements
 
-- Docker (for building the EFI binary)
+- Docker (for building the EFI binary on MacOS)
 - `qemu-system-x86_64` (for simulation)
 - OVMF firmware (UEFI for QEMU, typically installed with QEMU)
-
-### For real hardware (USB stick)
-- Everything above
-- A USB stick (any size)
+- A USB stick if you want to run it on hardware
 
 ## Building and Running
 
-Build the EFI binary (runs in Docker):
+Build the EFI binary:
 
 ```
 ./util/build-efi64
@@ -44,7 +43,7 @@ Build the EFI binary (runs in Docker):
 
 ### Simulation
 
-Three GPU configurations are available:
+Three GPU configurations are defined in the Makefile:
 
 ```
 make sim-bga       # Bochs Graphics Adapter — page flipping, no shimmer
@@ -81,7 +80,7 @@ Then boot from the USB stick via the UEFI boot menu (usually F8, F12, or DEL at 
 
 ## Disk Utility
 
-The `idu` tool manages files on the virtual disk image from the host.
+The `idu` tool manages files on the virtual disk image from the development environment.
 
 ```
 idu list                          # list files
@@ -99,8 +98,6 @@ Create a new disk image:
 dd if=/dev/zero of=disk.img bs=1M count=2
 idu format
 ```
-
-### Writing BASIC programs to the virtual disk
 
 Write all example programs at once:
 
@@ -159,27 +156,9 @@ The system status area at `0x70000` is readable from BASIC via `PEEK`. The inter
 
 Memory is managed by a bump allocator. The UEFI boot stub finds the largest free memory region (163 MB in QEMU with 256 MB RAM, much larger on real hardware). Framebuffer buffers are allocated first, then a watermark is set. BASIC data (program text, variables, arrays) is allocated above the watermark and freed on `CLR`. The `FREE` command (planned) will show remaining heap space.
 
-For the full BASIC language reference, see [Basic.md](Basic.md).
-
-## Running on Real Hardware
-
-### UEFI PC
-
-Build a bootable USB with `./util/build-efi64` and `./util/make-usb-img`, then write `icarus-usb.img` to a USB stick. This produces a 64-bit UEFI application with a proper GPT partition table.
-
-Successfully tested on:
-- AMD Ryzen 5 2600X / ASUS motherboard / American Megatrends UEFI
-- NVIDIA GeForce GTX 1650 (TU117) — EVO display engine driver
-- AHCI SATA disk (1TB WDC)
-- 64GB RAM detected
-
-### Hardware Notes
+## Hardware Notes
 
 - **Keyboard**: A PS/2 keyboard is required. USB keyboards rely on UEFI PS/2 emulation which stops working after ExitBootServices. Most ASUS and similar motherboards have a PS/2 port on the back panel.
 - **Display**: ICARUS probes PCI for a supported GPU. On NVIDIA GTX 1650 (TU117), it initializes the EVO display engine with core and window channels. On QEMU, BGA and VMware SVGA drivers provide page flipping. Falls back to UEFI GOP framebuffer on unsupported GPUs.
 - **Disk**: The AHCI SATA driver works with modern SATA controllers. Falls back to ATA PIO for legacy/QEMU configurations. NVMe is not yet supported.
-- **BIOS Setup**: If you can't enter BIOS setup, try clearing CMOS by removing the motherboard coin battery for 30 seconds with power disconnected.
 
-## Documentation
-
-See `Basic.md` for the full BASIC language reference with detailed examples.
