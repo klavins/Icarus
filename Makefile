@@ -97,7 +97,7 @@ QEMU_COMMON = qemu-system-x86_64 \
 		-device ahci,id=ahci0 \
 		-drive file=disk.img,format=raw,if=none,id=data -device ide-hd,drive=data,bus=ahci0.0 \
 		-m 256 -smp 1 -net none \
-		-display cocoa,zoom-to-fit=on -full-screen \
+		-display cocoa,zoom-to-fit=on \
 		-machine pcspk-audiodev=snd \
 		-audiodev coreaudio,id=snd,timer-period=1000,out.buffer-count=2
 
