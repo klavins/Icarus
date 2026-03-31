@@ -20,14 +20,14 @@ set -e
 CC=gcc
 OBJCOPY=objcopy
 
-CFLAGS_BASE="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -fcf-protection=none -I os -I lib -I basic -I boot -I/usr/include/efi -I/usr/include/efi/x86_64 -DUEFI_BUILD -DGNU_EFI"
+CFLAGS_BASE="-std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -fcf-protection=none -I os -I lib -I basic -I boot -I edit -I/usr/include/efi -I/usr/include/efi/x86_64 -DUEFI_BUILD -DGNU_EFI"
 CFLAGS="$CFLAGS_BASE"
 CFLAGS_NOSSE="$CFLAGS_BASE -mno-sse -mno-mmx -mno-sse2"
 
 mkdir -p build-efi64
 
 echo "==> Compiling (64-bit)..."
-for f in boot/uefi_boot64.c os/fbconsole.c lib/klib.c lib/math.c boot/boot_info.c os/keyboard.c os/speaker.c os/pci.c os/nvidia.c os/bga.c os/vmware.c os/gpu.c os/ahci.c os/ata.c os/fs.c os/pat.c os/graphics.c os/os.c basic/basic_vars.c basic/basic_token.c basic/basic_expr.c basic/basic_exec.c basic/basic.c boot/kernel.c; do
+for f in boot/uefi_boot64.c os/fbconsole.c os/vt100.c lib/klib.c lib/malloc.c lib/math.c boot/boot_info.c os/keyboard.c os/speaker.c os/pci.c os/nvidia.c os/bga.c os/vmware.c os/gpu.c os/ahci.c os/ata.c os/fs.c os/pat.c os/graphics.c os/os.c basic/basic_vars.c basic/basic_token.c basic/basic_expr.c basic/basic_exec.c basic/basic.c edit/kilo_icarus.c boot/kernel.c; do
     base=$(basename "$f" .c)
     echo "    $f"
     $CC -c $CFLAGS "$f" -o "build-efi64/${base}.o"
@@ -58,11 +58,14 @@ ld -nostdlib -znocombreloc -T /usr/lib/elf_x86_64_efi.lds -shared \
     build-efi64/interrupts.o \
     build-efi64/math.o \
     build-efi64/os.o \
+    build-efi64/vt100.o \
+    build-efi64/malloc.o \
     build-efi64/basic_vars.o \
     build-efi64/basic_token.o \
     build-efi64/basic_expr.o \
     build-efi64/basic_exec.o \
     build-efi64/basic.o \
+    build-efi64/kilo_icarus.o \
     build-efi64/kernel.o \
     -L /usr/lib -lefi -lgnuefi \
     -o build-efi64/icarus64.so

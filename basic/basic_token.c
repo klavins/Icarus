@@ -55,6 +55,7 @@ static enum token_type keyword_type(const char *word) {
     if (strcmp(word, "AND") == 0)   return TOK_AND;
     if (strcmp(word, "OR") == 0)    return TOK_OR;
     if (strcmp(word, "NOT") == 0)   return TOK_NOT;
+    if (strcmp(word, "EDIT") == 0)  return TOK_EDIT;
     if (strcmp(word, "NEXT") == 0)  return TOK_NEXT;
     if (strcmp(word, "GOTO") == 0)   return TOK_GOTO;
     if (strcmp(word, "GOSUB") == 0)  return TOK_GOSUB;

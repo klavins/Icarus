@@ -1,5 +1,5 @@
 /*
- * interrupts.h - Interrupt subsystem API declarations
+ * malloc.h - Dynamic memory allocator declarations
  *
  * Copyright (C) 2026 Eric Klavins
  *
@@ -17,16 +17,23 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef INTERRUPTS_H
-#define INTERRUPTS_H
+#ifndef MALLOC_H
+#define MALLOC_H
 
-void interrupts_init(void);
+#include <stddef.h>
 
-/* Read a key from the key buffer, blocking until one is available.
- * Returns ASCII (0-127) or special key code (128+). */
-int keybuf_read_blocking(void);
+/* Initialize the heap with a given memory region */
+void heap_init(void *base, size_t size);
 
-/* Flush all pending keys from the buffer. */
-void keybuf_flush(void);
+/* Standard allocation functions */
+void *malloc(size_t size);
+void *realloc(void *ptr, size_t size);
+void  free(void *ptr);
+
+/* Convenience */
+void *calloc(size_t count, size_t size);
+
+/* Diagnostics */
+size_t heap_free_total(void);
 
 #endif

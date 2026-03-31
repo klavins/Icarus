@@ -91,7 +91,8 @@ enum token_type {
     TOK_FILLTO,
     TOK_AND,
     TOK_OR,
-    TOK_NOT
+    TOK_NOT,
+    TOK_EDIT
 };
 
 struct token {

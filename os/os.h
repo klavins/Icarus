@@ -41,13 +41,33 @@ void os_set_color(int fg, int bg);
 void os_get_color(int *fg, int *bg);
 void os_clear_screen(void);
 size_t os_cursor_col(void);
+size_t os_cursor_row(void);
+size_t os_screen_cols(void);
+size_t os_screen_rows(void);
+void os_set_cursor(int row, int col);
+void os_clear_to_eol(void);
+void os_show_cursor(int show);
+void os_write(const char *buf, int len);
 
 /* ---- Input ---- */
 
 char os_read_key(void);           /* blocking — waits for keypress */
+int  os_read_key_ext(void);      /* blocking — returns ASCII or special key code */
 int  os_key_state(int scancode);  /* non-blocking — 1 if held, 0 if not */
 int  os_last_key_ascii(void);     /* last key pressed (ASCII), 0 if none */
 void os_flush_keys(void);
+
+/* Special key codes returned by os_read_key_ext */
+#define OS_KEY_ARROW_UP    128
+#define OS_KEY_ARROW_DOWN  129
+#define OS_KEY_ARROW_LEFT  130
+#define OS_KEY_ARROW_RIGHT 131
+#define OS_KEY_HOME        132
+#define OS_KEY_END         133
+#define OS_KEY_PAGE_UP     134
+#define OS_KEY_PAGE_DOWN   135
+#define OS_KEY_DELETE      136
+#define OS_KEY_INSERT      137
 
 /* ---- Sound ---- */
 

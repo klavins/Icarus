@@ -46,10 +46,21 @@ void os_set_color(int fg, int bg) { terminal_setcolor(fg, bg); }
 void os_get_color(int *fg, int *bg) { terminal_getcolor(fg, bg); }
 void os_clear_screen(void) { terminal_clear(); }
 size_t os_cursor_col(void) { return terminal_getcol(); }
+size_t os_cursor_row(void) { return terminal_getrow(); }
+size_t os_screen_cols(void) { return terminal_getcols(); }
+size_t os_screen_rows(void) { return terminal_getrows(); }
+void os_set_cursor(int row, int col) { terminal_setcursor(row, col); }
+void os_clear_to_eol(void) { terminal_clear_to_eol(); }
+void os_show_cursor(int show) { terminal_show_cursor(show); }
+
+/* VT100 interpreter — defined in vt100.c */
+extern void vt100_write(const char *buf, int len);
+void os_write(const char *buf, int len) { vt100_write(buf, len); }
 
 /* ---- Input ---- */
 
-char os_read_key(void) { return keyboard_poll(); }
+char os_read_key(void) { return (char)keybuf_read_blocking(); }
+int  os_read_key_ext(void) { return keybuf_read_blocking(); }
 
 int os_key_state(int scancode) {
     if (scancode < 0 || scancode > 127) return 0;

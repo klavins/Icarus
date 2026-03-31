@@ -41,6 +41,14 @@ void terminal_putchar(char c);
 void terminal_print(const char *s);
 void terminal_printf(const char *fmt, ...);
 size_t terminal_getcol(void);
+size_t terminal_getrow(void);
+size_t terminal_getcols(void);
+size_t terminal_getrows(void);
+void   terminal_setcursor(size_t row, size_t col);
+void   terminal_clear_to_eol(void);
+void   terminal_show_cursor(int show);
+void   terminal_flush_lock(void);
+void   terminal_flush_unlock(void);
 
 /* Framebuffer access for graphics module */
 void    terminal_get_fb(uint8_t **addr, uint32_t *width, uint32_t *height,

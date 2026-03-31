@@ -24,8 +24,8 @@
 
 #define FS_MAGIC       0x49434152  /* "ICAR" */
 #define FS_MAX_FILES   32
-#define FS_NAME_LEN    12
-#define FS_DATA_START  10          /* first data sector */
+#define FS_NAME_LEN    32
+#define FS_DATA_START  33          /* first data sector (after 1 header + 32 dir entries) */
 
 struct __attribute__((packed)) fs_header {
     uint32_t magic;

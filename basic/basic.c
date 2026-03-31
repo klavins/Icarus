@@ -236,6 +236,16 @@ void basic_exec(const char *line) {
         return;
     }
 
+    /* EDIT "filename" */
+    if (tokens[0].type == TOK_EDIT) {
+        extern void kilo_run(const char *filename);
+        if (tokens[1].type == TOK_STRING)
+            kilo_run(tokens[1].string_val);
+        else
+            kilo_run(0);
+        return;
+    }
+
     /* DELETE "filename" */
     if (tokens[0].type == TOK_DELETE) {
         if (tokens[1].type != TOK_STRING) {

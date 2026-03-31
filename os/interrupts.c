@@ -50,15 +50,28 @@ static const char scancode_upper[128] = {
     '*',0,  ' ',
 };
 
+/* Special key codes (128+) for non-ASCII keys */
+#define KEY_ARROW_UP    128
+#define KEY_ARROW_DOWN  129
+#define KEY_ARROW_LEFT  130
+#define KEY_ARROW_RIGHT 131
+#define KEY_HOME        132
+#define KEY_END         133
+#define KEY_PAGE_UP     134
+#define KEY_PAGE_DOWN   135
+#define KEY_DELETE       136
+#define KEY_INSERT       137
+
 /* Key buffer — ring buffer filled by ISR, read by keyboard_poll */
 #define KEYBUF_SIZE 64
-static volatile char keybuf[KEYBUF_SIZE];
+static volatile int keybuf[KEYBUF_SIZE];
 static volatile int keybuf_head;
 static volatile int keybuf_tail;
 
 static int shift_held;
+static int ctrl_held;
 
-static void keybuf_put(char c) {
+static void keybuf_put(int c) {
     int next = (keybuf_head + 1) % KEYBUF_SIZE;
     if (next != keybuf_tail) { /* not full */
         keybuf[keybuf_head] = c;
@@ -188,9 +201,11 @@ void keyboard_handler(void) {
     uint8_t scancode = inb(KB_DATA_PORT);
     volatile uint8_t *keystate = SYS_KEYSTATE_PTR;
 
-    /* Track shift state */
+    /* Track modifier key state */
     if (scancode == 0x2A || scancode == 0x36) { shift_held = 1; goto eoi; }
     if (scancode == 0xAA || scancode == 0xB6) { shift_held = 0; goto eoi; }
+    if (scancode == 0x1D) { ctrl_held = 1; goto eoi; }
+    if (scancode == 0x9D) { ctrl_held = 0; goto eoi; }
 
     if (scancode & 0x80) {
         /* Key release */
@@ -199,9 +214,30 @@ void keyboard_handler(void) {
         /* Key press */
         keystate[scancode] = 1;
         *((volatile uint8_t *)SYS_LASTKEY) = scancode;
-        if (scancode < sizeof(scancode_lower)) {
+
+        /* Check for special keys first */
+        int special = 0;
+        switch (scancode) {
+        case 0x48: special = KEY_ARROW_UP;    break;
+        case 0x50: special = KEY_ARROW_DOWN;  break;
+        case 0x4B: special = KEY_ARROW_LEFT;  break;
+        case 0x4D: special = KEY_ARROW_RIGHT; break;
+        case 0x47: special = KEY_HOME;        break;
+        case 0x4F: special = KEY_END;         break;
+        case 0x49: special = KEY_PAGE_UP;     break;
+        case 0x51: special = KEY_PAGE_DOWN;   break;
+        case 0x53: special = KEY_DELETE;      break;
+        case 0x52: special = KEY_INSERT;      break;
+        }
+        if (special) {
+            keybuf_put(special);
+        } else if (scancode < sizeof(scancode_lower)) {
             const char *map = shift_held ? scancode_upper : scancode_lower;
             char ascii = map[scancode];
+            if (ctrl_held && ascii >= 'a' && ascii <= 'z')
+                ascii = ascii & 0x1F;  /* Ctrl+a=1, Ctrl+b=2, ... Ctrl+z=26 */
+            else if (ctrl_held && ascii >= 'A' && ascii <= 'Z')
+                ascii = ascii & 0x1F;
             *((volatile uint8_t *)SYS_LASTASCII) = (uint8_t)ascii;
             if (ascii)
                 keybuf_put(ascii);
@@ -286,10 +322,10 @@ void sysinfo_init(void) {
     keybuf_tail = 0;
 }
 
-char keybuf_read_blocking(void) {
+int keybuf_read_blocking(void) {
     while (keybuf_head == keybuf_tail)
         asm volatile ("hlt"); /* sleep until next interrupt */
-    char c = keybuf[keybuf_tail];
+    int c = keybuf[keybuf_tail];
     keybuf_tail = (keybuf_tail + 1) % KEYBUF_SIZE;
     return c;
 }

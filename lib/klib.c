@@ -18,6 +18,7 @@
  */
 
 #include "klib.h"
+#include "malloc.h"
 #include <stdarg.h>
 
 /* ---- Memory ---- */
@@ -54,6 +55,19 @@ void *memcpy(void *dest, const void *src, size_t len) {
     }
     while (tail--)
         *d++ = *s++;
+    return dest;
+}
+
+void *memmove(void *dest, const void *src, size_t len) {
+    unsigned char *d = dest;
+    const unsigned char *s = src;
+    if (d <= s || d >= s + len) {
+        return memcpy(dest, src, len);
+    }
+    /* Overlap with dest after src — copy backwards */
+    d += len;
+    s += len;
+    while (len--) *--d = *--s;
     return dest;
 }
 
@@ -102,6 +116,43 @@ char *strncpy(char *dest, const char *src, size_t n) {
         *d++ = '\0';
     return dest;
 }
+
+char *strdup(const char *s) {
+    size_t len = strlen(s) + 1;
+    char *d = malloc(len);
+    if (d) memcpy(d, s, len);
+    return d;
+}
+
+char *strchr(const char *s, int c) {
+    while (*s) {
+        if (*s == (char)c) return (char *)s;
+        s++;
+    }
+    return (c == '\0') ? (char *)s : (void *)0;
+}
+
+char *strstr(const char *haystack, const char *needle) {
+    if (!*needle) return (char *)haystack;
+    for (; *haystack; haystack++) {
+        const char *h = haystack, *n = needle;
+        while (*h && *n && *h == *n) { h++; n++; }
+        if (!*n) return (char *)haystack;
+    }
+    return (void *)0;
+}
+
+/* ---- Character classification ---- */
+
+int isdigit(int c) { return c >= '0' && c <= '9'; }
+int isalpha(int c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+int isalnum(int c) { return isalpha(c) || isdigit(c); }
+int isspace(int c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'; }
+int isupper(int c) { return c >= 'A' && c <= 'Z'; }
+int islower(int c) { return c >= 'a' && c <= 'z'; }
+int isprint(int c) { return c >= 32 && c <= 126; }
+int toupper(int c) { return islower(c) ? c - 32 : c; }
+int tolower(int c) { return isupper(c) ? c + 32 : c; }
 
 /* ---- Number to string ---- */
 
@@ -278,16 +329,33 @@ static char *dtoa(double val, char *buf) {
     return buf;
 }
 
-/* ---- sprintf ---- */
+/* ---- sprintf / snprintf ---- */
 /* Supports: %d %u %x %c %s %g %% */
 
-int vsprintf(char *buf, const char *fmt, va_list args) {
-    char *out = buf;
+/* Helper: emit one character, respecting the buffer limit */
+static int emit(char *buf, size_t pos, size_t max, char c) {
+    if (pos < max) buf[pos] = c;
+    return 1;
+}
+
+/* Helper: emit a string */
+static int emits(char *buf, size_t pos, size_t max, const char *s) {
+    int n = 0;
+    while (*s) {
+        if (pos + n < max) buf[pos + n] = *s;
+        s++;
+        n++;
+    }
+    return n;
+}
+
+int vsnprintf(char *buf, size_t max, const char *fmt, va_list args) {
+    size_t pos = 0;
     char tmp[33];
 
     while (*fmt) {
         if (*fmt != '%') {
-            *out++ = *fmt++;
+            pos += emit(buf, pos, max, *fmt++);
             continue;
         }
         fmt++; /* skip '%' */
@@ -296,62 +364,70 @@ int vsprintf(char *buf, const char *fmt, va_list args) {
         case 'd': {
             int val = va_arg(args, int);
             itoa(val, tmp, 10);
-            for (char *s = tmp; *s; )
-                *out++ = *s++;
+            pos += emits(buf, pos, max, tmp);
             break;
         }
         case 'u': {
             unsigned int val = va_arg(args, unsigned int);
             utoa(val, tmp, 10);
-            for (char *s = tmp; *s; )
-                *out++ = *s++;
+            pos += emits(buf, pos, max, tmp);
             break;
         }
         case 'x': {
             unsigned int val = va_arg(args, unsigned int);
             utoa(val, tmp, 16);
-            for (char *s = tmp; *s; )
-                *out++ = *s++;
+            pos += emits(buf, pos, max, tmp);
             break;
         }
         case 'c': {
             char c = (char)va_arg(args, int);
-            *out++ = c;
+            pos += emit(buf, pos, max, c);
             break;
         }
         case 's': {
             const char *s = va_arg(args, const char *);
             if (!s) s = "(null)";
-            while (*s)
-                *out++ = *s++;
+            pos += emits(buf, pos, max, s);
             break;
         }
         case 'g': {
             double val = va_arg(args, double);
             dtoa(val, tmp);
-            for (char *s = tmp; *s; )
-                *out++ = *s++;
+            pos += emits(buf, pos, max, tmp);
             break;
         }
         case '%':
-            *out++ = '%';
+            pos += emit(buf, pos, max, '%');
             break;
         default:
-            *out++ = '%';
-            *out++ = *fmt;
+            pos += emit(buf, pos, max, '%');
+            pos += emit(buf, pos, max, *fmt);
             break;
         }
         fmt++;
     }
 
-    *out = '\0';
-    return (int)(out - buf);
+    /* Null-terminate: always, unless max == 0 */
+    if (max > 0) buf[pos < max ? pos : max - 1] = '\0';
+    return (int)pos;
+}
+
+int vsprintf(char *buf, const char *fmt, va_list args) {
+    return vsnprintf(buf, (size_t)-1, fmt, args);
+}
+
+int snprintf(char *buf, size_t max, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int ret = vsnprintf(buf, max, fmt, args);
+    va_end(args);
+    return ret;
 }
 
 int sprintf(char *buf, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    int ret = vsprintf(buf, fmt, args);
+    int ret = vsnprintf(buf, (size_t)-1, fmt, args);
     va_end(args);
     return ret;
 }

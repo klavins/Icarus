@@ -46,6 +46,8 @@ static uint32_t fb_rows;
 
 static size_t cursor_row;
 static size_t cursor_col;
+static int wrap_pending;    /* deferred wrap: set when cursor hits last column */
+static int cursor_visible = 1;  /* cursor show/hide state */
 static uint32_t fg_color;
 static uint32_t bg_color;
 static int raw_fg;
@@ -116,9 +118,14 @@ static inline void fb_pixel(uint32_t x, uint32_t y, uint32_t color) {
     }
 }
 
+/* Flush batching — when flush_lock > 0, skip flushes; dirty flag tracks need */
+static int flush_lock;
+static int flush_dirty;
+
 /* Flush a rectangular region from shadow to real framebuffer */
 static void fb_flush_region(uint32_t y0, uint32_t rows) {
     if (!fb_shadow) return;
+    if (flush_lock) { flush_dirty = 1; return; }
     uint32_t offset = y0 * fb_pitch;
     uint32_t bytes  = rows * fb_pitch;
     memcpy(fb_addr + offset, fb_shadow + offset, bytes);
@@ -127,11 +134,25 @@ static void fb_flush_region(uint32_t y0, uint32_t rows) {
 
 static void fb_flush_all(void) {
     if (!fb_shadow) return;
+    if (flush_lock) { flush_dirty = 1; return; }
     memcpy(fb_addr, fb_shadow, fb_pitch * fb_height);
     gpu_update(0, 0, fb_width, fb_height);
 }
 
+void terminal_flush_lock(void) { flush_lock++; }
+void terminal_flush_unlock(void) {
+    if (--flush_lock <= 0) {
+        flush_lock = 0;
+        if (flush_dirty) {
+            flush_dirty = 0;
+            memcpy(fb_addr, fb_shadow, fb_pitch * fb_height);
+            gpu_update(0, 0, fb_width, fb_height);
+        }
+    }
+}
+
 static void draw_cursor(int show) {
+    if (!cursor_visible) return;  /* don't draw while hidden */
     uint32_t x0 = cursor_col * CELL_W;
     uint32_t y0 = cursor_row * CELL_H + CELL_H - 2 * text_scale;
     uint32_t color = show ? fg_color : bg_color;
@@ -280,15 +301,23 @@ void terminal_clear(void) {
     }
     cursor_row = 0;
     cursor_col = 0;
+    wrap_pending = 0;
     draw_cursor(1);
     fb_flush_all();
 }
 
 void terminal_putchar(char c) {
     draw_cursor(0); /* erase cursor */
+    if (c == '\r') {
+        cursor_col = 0;
+        wrap_pending = 0;
+        draw_cursor(1);
+        return;
+    }
     if (c == '\b') {
         if (cursor_col > 0) {
             cursor_col--;
+            wrap_pending = 0;
             fb_draw_char(cursor_col, cursor_row, ' ', fg_color, bg_color);
         }
         draw_cursor(1);
@@ -298,6 +327,7 @@ void terminal_putchar(char c) {
     if (c == '\n') {
         uint32_t old_row = cursor_row;
         cursor_col = 0;
+        wrap_pending = 0;
         if (++cursor_row >= fb_rows) {
             fb_scroll(); /* does its own flush_all */
             cursor_row = fb_rows - 1;
@@ -310,14 +340,21 @@ void terminal_putchar(char c) {
         fb_flush_region(cursor_row * CELL_H, CELL_H);
         return;
     }
+    /* Deferred wrap: if a previous character hit the last column, wrap now */
+    if (wrap_pending) {
+        wrap_pending = 0;
+        cursor_col = 0;
+        if (++cursor_row >= fb_rows) {
+            fb_scroll();
+            cursor_row = fb_rows - 1;
+        }
+    }
     uint32_t char_row = cursor_row;
     fb_draw_char(cursor_col, cursor_row, (unsigned char)c, fg_color, bg_color);
     if (++cursor_col >= fb_cols) {
-        cursor_col = 0;
-        if (++cursor_row >= fb_rows) {
-            fb_scroll(); /* does its own flush_all */
-            cursor_row = fb_rows - 1;
-        }
+        /* Don't wrap yet — defer until next character or \n */
+        cursor_col = fb_cols - 1; /* stay at last column */
+        wrap_pending = 1;
     }
     draw_cursor(1);
     /* Flush the row(s) we touched */
@@ -342,6 +379,43 @@ void terminal_printf(const char *fmt, ...) {
 
 size_t terminal_getcol(void) {
     return cursor_col;
+}
+
+size_t terminal_getrow(void) {
+    return cursor_row;
+}
+
+size_t terminal_getcols(void) {
+    return fb_cols;
+}
+
+size_t terminal_getrows(void) {
+    return fb_rows;
+}
+
+void terminal_setcursor(size_t row, size_t col) {
+    draw_cursor(0);
+    if (row >= fb_rows) row = fb_rows - 1;
+    if (col >= fb_cols) col = fb_cols - 1;
+    cursor_row = row;
+    cursor_col = col;
+    wrap_pending = 0;
+    draw_cursor(1);
+    fb_flush_region(cursor_row * CELL_H, CELL_H);
+}
+
+void terminal_clear_to_eol(void) {
+    draw_cursor(0);
+    for (size_t c = cursor_col; c < fb_cols; c++)
+        fb_draw_char(c, cursor_row, ' ', fg_color, bg_color);
+    draw_cursor(1);
+    fb_flush_region(cursor_row * CELL_H, CELL_H);
+}
+
+void terminal_show_cursor(int show) {
+    cursor_visible = show;
+    draw_cursor(show);
+    fb_flush_region(cursor_row * CELL_H, CELL_H);
 }
 
 void terminal_get_fb(uint8_t **addr, uint32_t *width, uint32_t *height,

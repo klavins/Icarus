@@ -5,6 +5,6 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 IDU="$SCRIPT_DIR/idu"
 
 for f in "$PROJECT_DIR"/examples/*.bas; do
-    name=$(basename "$f" .bas | tr '[:lower:]' '[:upper:]')
+    name=$(basename "$f")
     "$IDU" write "$name" "$f"
 done

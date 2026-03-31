@@ -23,7 +23,7 @@ ISO     = icarus.iso
 # Source files that affect UEFI builds
 SRCS    = $(wildcard *.c *.h *.asm os/*.c os/*.h lib/*.c lib/*.h basic/*.c basic/*.h boot/*.c boot/*.h)
 
-.PHONY: all clean run iso sim sim-fb sim-uefi sim-bga sim-vmware sim-gop docker-iso
+.PHONY: all clean run iso sim sim-fb sim-uefi sim-bga sim-vmware sim-gop docker-iso test
 
 all: $(ISO)
 
@@ -97,21 +97,25 @@ QEMU_COMMON = qemu-system-x86_64 \
 		-device ahci,id=ahci0 \
 		-drive file=disk.img,format=raw,if=none,id=data -device ide-hd,drive=data,bus=ahci0.0 \
 		-m 256 -smp 1 -net none \
-		-display cocoa,zoom-to-fit=on \
+		-display cocoa,zoom-to-fit=on -full-screen \
 		-machine pcspk-audiodev=snd \
 		-audiodev coreaudio,id=snd,timer-period=1000,out.buffer-count=2
 
 sim-bga: icarus-uefi64.img
 	cp $(OVMF_VARS) /tmp/ovmf-vars.fd
-	$(QEMU_COMMON) -device VGA,vgamem_mb=32
+	$(QEMU_COMMON) -device VGA,vgamem_mb=2
 
 sim-vmware: icarus-uefi64.img
 	cp $(OVMF_VARS) /tmp/ovmf-vars.fd
-	$(QEMU_COMMON) -vga vmware
+	$(QEMU_COMMON) -device vmware-svga,vgamem_mb=2
 
 sim-gop: icarus-uefi64.img
 	cp $(OVMF_VARS) /tmp/ovmf-vars.fd
 	$(QEMU_COMMON) -vga none -device ramfb
+
+sim-test: icarus-uefi64.img
+	cp $(OVMF_VARS) /tmp/ovmf-vars.fd
+	$(QEMU_COMMON) -device VGA,vgamem_mb=8
 
 icarus-uefi64.img: $(SRCS)
 	./util/build-efi64
@@ -119,6 +123,13 @@ icarus-uefi64.img: $(SRCS)
 docker-iso:
 	docker run --rm --platform linux/amd64 -v "$(CURDIR)":/src -w /src ubuntu:latest bash -c \
 		"apt-get update -qq && apt-get install -y -qq nasm gcc-i686-linux-gnu make grub-pc-bin xorriso >/dev/null 2>&1 && make clean && make iso CC=i686-linux-gnu-gcc LD=i686-linux-gnu-gcc"
+
+test:
+	@for src in test/*.c; do \
+		name=$$(basename $$src .c); \
+		echo "--- $$name ---"; \
+		cc -o test/$$name $$src -Wall -Wextra && ./test/$$name; \
+	done
 
 clean:
 	rm -rf $(BUILD) build-efi build-efi64 $(KERNEL) $(KERNEL_FB) icarus-uefi.img icarus-uefi64.img $(ISO) isodir

@@ -23,8 +23,8 @@ import os
 SECTOR_SIZE = 512
 FS_MAGIC = 0x49434152  # "ICAR"
 FS_MAX_FILES = 32
-FS_NAME_LEN = 12
-FS_DATA_START = 10
+FS_NAME_LEN = 32
+FS_DATA_START = 33
 
 def read_sector(f, lba):
     f.seek(lba * SECTOR_SIZE)
