@@ -137,7 +137,7 @@ Key bindings:
 - **Page Up/Down** — Scroll by screen
 - **Home/End** — Beginning/end of line
 
-The editor supports C syntax highlighting for `.c` and `.h` files.
+The editor can be used to edit any file type. It supports syntax highlighting for BASIC (`.bas`) and C (`.c`, `.h`) files, with keywords, strings, and numbers in distinct colors. C program execution is not yet implemented.
 
 ## Memory Map
 

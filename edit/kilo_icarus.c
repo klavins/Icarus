@@ -176,6 +176,21 @@ char *C_HL_keywords[] = {
         "void|","short|","auto|","const|","bool|",NULL
 };
 
+/* BASIC */
+char *BAS_HL_extensions[] = {".bas",".BAS",NULL};
+char *BAS_HL_keywords[] = {
+    /* Control flow */
+    "IF","THEN","FOR","TO","STEP","NEXT","GOTO","GOSUB","RETURN",
+    "ON","RUN","END","STOP",
+    /* Commands */
+    "PRINT|","LET|","DIM|","INPUT|","READ|","DATA|","RESTORE|",
+    "GRAPHICS|","GR|","PLOT|","DRAWTO|","FILLTO|","COLOR|","POS|","TEXT|",
+    "SOUND|","PAUSE|","DELAY|","POKE|","CLS|","CLR|",
+    "SAVE|","LOAD|","DIR|","DELETE|","FORMAT|","EDIT|","LIST|",
+    "AND|","OR|","NOT|","REM|",
+    NULL
+};
+
 /* Here we define an array of syntax highlights by extensions, keywords,
  * comments delimiters and flags. */
 struct editorSyntax HLDB[] = {
@@ -184,6 +199,13 @@ struct editorSyntax HLDB[] = {
         C_HL_extensions,
         C_HL_keywords,
         "//","/*","*/",
+        HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
+    },
+    {
+        /* BASIC */
+        BAS_HL_extensions,
+        BAS_HL_keywords,
+        "","","",  /* no comment syntax — REM is highlighted as a keyword */
         HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
     }
 };
@@ -387,7 +409,7 @@ int editorSyntaxToColor(int hl) {
     case HL_KEYWORD1: return 33;    /* yellow */
     case HL_KEYWORD2: return 32;    /* green */
     case HL_STRING: return 35;      /* magenta */
-    case HL_NUMBER: return 31;      /* red */
+    case HL_NUMBER: return 36;      /* cyan */
     case HL_MATCH: return 34;      /* blu */
     default: return 37;             /* white */
     }
