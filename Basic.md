@@ -402,13 +402,13 @@ Format the virtual disk. Erases all files.
 
 Save the current program to disk.
 
-    SAVE "MYFILE"
+    SAVE "Ball.bas"
 
 ### LOAD
 
 Load a program from disk (replaces current program).
 
-    LOAD "MYFILE"
+    LOAD "Ball.bas"
 
 ### DIR
 
@@ -420,7 +420,15 @@ List files on disk and show free space.
 
 Delete a file from disk.
 
-    DELETE "MYFILE"
+    DELETE "Ball.bas"
+
+### EDIT
+
+Open a file in the built-in text editor. Creates a new file if it doesn't exist.
+
+    EDIT "myfile.txt"
+
+The editor is based on [kilo](https://github.com/antirez/kilo) by Salvatore Sanfilippo. Use Ctrl-S to save, Ctrl-Q to quit, and Ctrl-F to search. See the README for full key bindings.
 
 ### DOS
 
@@ -539,16 +547,16 @@ Create a text file with line numbers:
 
 Write it to disk:
 
-    idu write HELLO hello.bas
+    idu write "Hello.bas" hello.bas
 
 Then in ICARUS:
 
-    LOAD "HELLO"
+    LOAD "Hello.bas"
     RUN
 
 ### Notes
 
-- File names are limited to 11 characters.
+- File names are limited to 31 characters.
 - Create a disk image with `dd if=/dev/zero of=disk.img bs=1M count=2`.
 - Format before first use: `idu format` or `FORMAT` in ICARUS.
 - Do not modify the disk image while QEMU is running.

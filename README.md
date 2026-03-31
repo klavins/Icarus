@@ -13,7 +13,7 @@ When you power on, you get a prompt:
  >
 ```
 
-You can type BASIC commands, write programs, save them to disk, and draw graphics.
+You can type BASIC commands, write programs, save them to disk, draw graphics, and edit text files with the built-in editor.
 
 For the full BASIC language reference, see [Basic.md](Basic.md).
 
@@ -25,6 +25,8 @@ For the full BASIC language reference, see [Basic.md](Basic.md).
 - AHCI SATA disk with simple flat filesystem
 - PCI bus scanning with pluggable driver model
 - Atari-inspired BASIC: floating point, trig, graphics, sound, PEEK/POKE, disk I/O
+- Built-in text editor ([kilo](https://github.com/antirez/kilo) by Salvatore Sanfilippo) with VT100 terminal emulation
+- Dynamic memory allocator (malloc/realloc/free) and freestanding C library (klib)
 
 ## Requirements
 
@@ -46,8 +48,8 @@ Build the EFI binary:
 Three GPU configurations are defined in the Makefile:
 
 ```
-make sim-bga       # Bochs Graphics Adapter — page flipping, no shimmer
-make sim-vmware    # VMware SVGA — FIFO command submission
+make sim-bga       # Bochs Graphics Adapter
+make sim-vmware    # VMware SVGA — FIFO command submission, no tearing
 make sim-gop       # No GPU driver — GOP framebuffer fallback
 ```
 
@@ -83,11 +85,11 @@ Then boot from the USB stick via the UEFI boot menu (usually F8, F12, or DEL at 
 The `idu` tool manages files on the virtual disk image from the development environment.
 
 ```
-idu list                          # list files
-idu write MYPROG myprogram.bas    # write a file to disk
-idu read MYPROG                   # read a file from disk
-idu delete MYPROG                 # delete a file
-idu format                        # format the disk (erases all files)
+idu list                              # list files
+idu write "Ball.bas" examples/Ball.bas  # write a file to disk
+idu read "Ball.bas"                   # read a file from disk
+idu delete "Ball.bas"                 # delete a file
+idu format                            # format the disk (erases all files)
 ```
 
 Defaults to `disk.img` in the current directory. Use `-f path` for a different image.
@@ -108,15 +110,34 @@ Write all example programs at once:
 Or write individual files:
 
 ```
-idu write HELLO hello.bas
+idu write "Hello.bas" hello.bas
 ```
 
 Then in ICARUS:
 
 ```
-LOAD "HELLO"
+LOAD "Hello.bas"
 RUN
 ```
+
+### Editor
+
+ICARUS includes a built-in text editor based on [kilo](https://github.com/antirez/kilo) by Salvatore Sanfilippo. Launch it from the BASIC prompt:
+
+```
+EDIT "myfile.txt"
+```
+
+Key bindings:
+
+- **Ctrl-S** — Save to disk
+- **Ctrl-Q** — Quit (press 3 times to discard unsaved changes)
+- **Ctrl-F** — Search
+- **Arrow keys** — Navigate
+- **Page Up/Down** — Scroll by screen
+- **Home/End** — Beginning/end of line
+
+The editor supports C syntax highlighting for `.c` and `.h` files.
 
 ## Memory Map
 
@@ -143,6 +164,7 @@ Address         Size        Description
                              Text console shadow buffer (~3-9 MB depending on resolution)
                              Graphics shadow buffer (same size)
                              Graphics saved-screen buffer (same size)
+                             malloc/free heap (512 KB for editor and C programs)
                              ── watermark ── (CLR resets to here)
                              BASIC program text (allocated per line)
                              BASIC variables and arrays (allocated on DIM)
@@ -154,7 +176,7 @@ Address         Size        Description
 
 The system status area at `0x70000` is readable from BASIC via `PEEK`. The interrupt handler updates key state and timer ticks here in real time. See `sysinfo.h` for the full layout.
 
-Memory is managed by a bump allocator. The UEFI boot stub finds the largest free memory region (163 MB in QEMU with 256 MB RAM, much larger on real hardware). Framebuffer buffers are allocated first, then a watermark is set. BASIC data (program text, variables, arrays) is allocated above the watermark and freed on `CLR`. The `FREE` command (planned) will show remaining heap space.
+Memory is managed by a bump allocator for BASIC and a first-fit free-list allocator (malloc/realloc/free) for the editor and future C programs. The UEFI boot stub finds the largest free memory region (163 MB in QEMU with 256 MB RAM, much larger on real hardware). Framebuffer buffers and the malloc heap are allocated first, then a watermark is set. BASIC data (program text, variables, arrays) is allocated above the watermark and freed on `CLR`.
 
 ## Hardware Notes
 
