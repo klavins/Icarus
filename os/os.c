@@ -26,6 +26,7 @@
 #include "fs.h"
 #include "io.h"
 #include "klib.h"
+#include "malloc.h"
 #include <stdarg.h>
 
 /* ---- Display ---- */
@@ -89,18 +90,13 @@ int os_file_exists(const char *name) { return fs_exists(name); }
 
 /* ---- Memory ---- */
 
-/* These are defined in basic_vars.c — forward to them */
 extern void   basic_heap_init(void);
-extern void  *basic_alloc(size_t size);
-extern void   basic_alloc_reset(void);
-extern void   basic_alloc_set_watermark(void);
 extern size_t basic_heap_free(void);
 
 void   os_heap_init(void) { basic_heap_init(); }
-void  *os_alloc(size_t size) { return basic_alloc(size); }
-void   os_alloc_reset(void) { basic_alloc_reset(); }
-void   os_alloc_set_watermark(void) { basic_alloc_set_watermark(); }
+void  *os_alloc(size_t size) { return malloc(size); }
 size_t os_heap_free(void) { return basic_heap_free(); }
+size_t os_heap_used(void) { return heap_used_total(); }
 
 /* ---- Timer ---- */
 

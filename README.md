@@ -160,15 +160,14 @@ Address         Size        Description
                              .rodata  String literals, font data, VGA palette
                              .data    Small initialized globals
                              .bss     IDT, GDT, small static tables
-0x01000000+     163+ MB     Kernel heap (bump allocator, size from UEFI memory map)
+0x01000000+     163+ MB     Kernel heap (malloc/free, size from UEFI memory map)
                              Text console shadow buffer (~3-9 MB depending on resolution)
                              Graphics shadow buffer (same size)
                              Graphics saved-screen buffer (same size)
-                             malloc/free heap (512 KB for editor and C programs)
-                             ── watermark ── (CLR resets to here)
                              BASIC program text (allocated per line)
                              BASIC variables and arrays (allocated on DIM)
                              BASIC string variable data (allocated on DIM)
+                             Editor buffers (allocated/freed on EDIT)
 0xE0000000+     256 MB      GPU BAR1 (NVIDIA VRAM window, UC)
 0xF1000000      ~5 MB       GOP framebuffer (NVIDIA VRAM via UEFI, WC)
                              Used for all CPU framebuffer writes
@@ -176,7 +175,7 @@ Address         Size        Description
 
 The system status area at `0x70000` is readable from BASIC via `PEEK`. The interrupt handler updates key state and timer ticks here in real time. See `sysinfo.h` for the full layout.
 
-Memory is managed by a bump allocator for BASIC and a first-fit free-list allocator (malloc/realloc/free) for the editor and future C programs. The UEFI boot stub finds the largest free memory region (163 MB in QEMU with 256 MB RAM, much larger on real hardware). Framebuffer buffers and the malloc heap are allocated first, then a watermark is set. BASIC data (program text, variables, arrays) is allocated above the watermark and freed on `CLR`.
+Memory is managed by a first-fit free-list allocator (malloc/realloc/free) shared by BASIC, the editor, and the OS. The UEFI boot stub finds the largest free memory region (163 MB in QEMU with 256 MB RAM, much larger on real hardware). Shadow buffers are allocated at boot. BASIC data (program text, variables, arrays) is allocated dynamically and freed on `CLR`. The `MEM` command shows current memory usage.
 
 ## Hardware Notes
 

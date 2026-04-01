@@ -19,6 +19,7 @@
 
 #include "basic_internal.h"
 #include "klib.h"
+#include "malloc.h"
 
 #define BASIC_FILENAME_LEN 12
 
@@ -38,8 +39,9 @@ static void program_insert(int linenum, const char *text) {
     int idx = program_find(linenum);
     if (idx >= 0) {
         /* Replace existing line */
+        free(program[idx].text);
         int len = strlen(text);
-        program[idx].text = basic_alloc(len + 1);
+        program[idx].text = malloc(len + 1);
         if (!program[idx].text) {
             os_print("?OUT OF MEMORY\n");
             return;
@@ -58,7 +60,7 @@ static void program_insert(int linenum, const char *text) {
         i--;
     }
     int len = strlen(text);
-    program[i].text = basic_alloc(len + 1);
+    program[i].text = malloc(len + 1);
     if (!program[i].text) {
         os_print("?OUT OF MEMORY\n");
         return;
@@ -152,13 +154,14 @@ static void dos_menu(void) {
 /* ---- Init ---- */
 
 void basic_init(void) {
-    basic_alloc_reset();
+    /* Free all program lines */
+    for (int i = 0; i < program_count; i++)
+        free(program[i].text);
     program_count = 0;
     for_depth = 0;
     gosub_depth = 0;
-    num_var_count = 0;
-    str_var_count = 0;
-    array_count = 0;
+    /* Free variables and arrays */
+    basic_free_vars();
 }
 
 /* ---- Public entry point ---- */
@@ -188,6 +191,24 @@ void basic_exec(const char *line) {
     if (tokens[0].type == TOK_CLR) {
         basic_init();
         os_print("OK\n");
+        return;
+    }
+
+    /* MEM command -- show memory usage */
+    if (tokens[0].type == TOK_IDENT && strcmp(tokens[0].string_val, "MEM") == 0) {
+        /* Count program memory */
+        int prog_bytes = 0;
+        for (int i = 0; i < program_count; i++)
+            if (program[i].text) prog_bytes += strlen(program[i].text) + 1;
+
+        size_t used = os_heap_used();
+        size_t free_mem = os_heap_free();
+        size_t system = used - prog_bytes;
+
+        os_printf(" System:  %d bytes\n", (int)system);
+        os_printf(" Program: %d bytes (%d lines)\n", prog_bytes, program_count);
+        os_printf(" Free:    %d bytes\n", (int)free_mem);
+        os_printf(" Total:   %d bytes\n", (int)(used + free_mem));
         return;
     }
 

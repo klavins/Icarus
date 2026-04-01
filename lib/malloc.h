@@ -35,5 +35,6 @@ void *calloc(size_t count, size_t size);
 
 /* Diagnostics */
 size_t heap_free_total(void);
+size_t heap_used_total(void);
 
 #endif

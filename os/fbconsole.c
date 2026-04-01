@@ -24,7 +24,7 @@
 #include "gpu.h"
 #include <stdarg.h>
 
-extern void *basic_alloc(size_t size);
+#include "malloc.h"
 
 #define FONT_W 8
 #define FONT_H 16
@@ -263,7 +263,7 @@ void terminal_init(void) {
 
     /* Allocate RAM shadow buffer — avoids slow MMIO reads during scroll */
     uint32_t fb_size = fb_pitch * fb_height;
-    fb_shadow = basic_alloc(fb_size);
+    fb_shadow = malloc(fb_size);
 
     fg_color = (fb_bpp == 4) ? color32_map[VGA_WHITE] : color8_map[VGA_WHITE];
     bg_color = (fb_bpp == 4) ? color32_map[VGA_BLACK] : color8_map[VGA_BLACK];
@@ -451,7 +451,7 @@ void terminal_set_fb(uint8_t *addr, uint32_t width, uint32_t height,
         fb_flush_all();
     } else {
         /* Resolution changed — need a new shadow buffer */
-        fb_shadow = basic_alloc(fb_pitch * fb_height);
+        fb_shadow = malloc(fb_pitch * fb_height);
         terminal_clear();
     }
 }

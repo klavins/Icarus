@@ -87,9 +87,8 @@ int  os_file_exists(const char *name);
 
 void  os_heap_init(void);
 void *os_alloc(size_t size);
-void  os_alloc_reset(void);
-void  os_alloc_set_watermark(void);
 size_t os_heap_free(void);
+size_t os_heap_used(void);
 
 /* ---- Timer ---- */
 

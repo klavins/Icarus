@@ -155,3 +155,13 @@ size_t heap_free_total(void) {
     }
     return total;
 }
+
+size_t heap_used_total(void) {
+    size_t total = 0;
+    struct block *b = free_list;
+    while (b) {
+        if (!b->free) total += b->size;
+        b = b->next;
+    }
+    return total;
+}

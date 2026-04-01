@@ -126,7 +126,7 @@ static void print_uefi_info(void) {
 
 void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
 
-    basic_heap_init();
+    basic_heap_init();  /* initializes malloc/free heap from boot info */
     pat_init();
     terminal_init();
     if (magic == MBOOT_MAGIC)
@@ -135,15 +135,6 @@ void kernel_main(uint32_t magic, struct multiboot_info *mboot) {
         print_uefi_info();
 
     graphics_alloc_init();
-
-    /* Initialize malloc heap — 512KB carved from the bump allocator */
-    {
-        #define MALLOC_HEAP_SIZE (512 * 1024)
-        void *mheap = basic_alloc(MALLOC_HEAP_SIZE);
-        if (mheap) heap_init(mheap, MALLOC_HEAP_SIZE);
-    }
-
-    basic_alloc_set_watermark();
 
     gpu_init();
 

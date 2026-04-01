@@ -122,12 +122,10 @@ void collect_data(void);
 int  read_line(char *buf, int max);
 double parse_number_string(const char *buf);
 
-/* ---- Bump allocator (basic_vars.c) ---- */
+/* ---- Heap (basic_vars.c) ---- */
 
 void   basic_heap_init(void);
-void  *basic_alloc(size_t size);
-void   basic_alloc_reset(void);
-void   basic_alloc_set_watermark(void);
 size_t basic_heap_free(void);
+void   basic_free_vars(void);
 
 #endif

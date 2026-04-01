@@ -1,5 +1,5 @@
 /*
- * basic_vars.c - BASIC interpreter variable storage and heap allocator
+ * basic_vars.c - BASIC interpreter variable storage
  *
  * Copyright (C) 2026 Eric Klavins
  *
@@ -19,13 +19,9 @@
 
 #include "basic_internal.h"
 #include "klib.h"
+#include "malloc.h"
 
-/* ---- Bump allocator ---- */
-
-static uint8_t *heap_base;
-static size_t heap_size;
-static size_t heap_pos;
-static size_t heap_watermark;
+/* ---- Heap init (delegates to malloc heap) ---- */
 
 void basic_heap_init(void) {
     /* Read heap info from boot info at 0x80000 */
@@ -36,37 +32,20 @@ void basic_heap_init(void) {
         uint32_t heap_base, heap_size;
     } *info = (void *)0x80000;
 
+    void *base;
+    size_t size;
     if (info->heap_base && info->heap_size) {
-        heap_base = (uint8_t *)(uintptr_t)info->heap_base;
-        heap_size = info->heap_size;
+        base = (void *)(uintptr_t)info->heap_base;
+        size = info->heap_size;
     } else {
-        /* Fallback: use memory at 16MB for non-UEFI builds */
-        heap_base = (uint8_t *)0x1000000;
-        heap_size = 4 * 1024 * 1024;
+        base = (void *)0x1000000;
+        size = 4 * 1024 * 1024;
     }
-    heap_pos = 0;
-    heap_watermark = 0;
-}
-
-void *basic_alloc(size_t size) {
-    /* Align to 8 bytes */
-    size = (size + 7) & ~(size_t)7;
-    if (heap_pos + size > heap_size) return (void *)0;
-    void *p = heap_base + heap_pos;
-    heap_pos += size;
-    return p;
-}
-
-void basic_alloc_set_watermark(void) {
-    heap_watermark = heap_pos;
-}
-
-void basic_alloc_reset(void) {
-    heap_pos = heap_watermark;
+    heap_init(base, size);
 }
 
 size_t basic_heap_free(void) {
-    return heap_size - heap_pos;
+    return heap_free_total();
 }
 
 /* ---- Numeric variables ---- */
@@ -158,7 +137,8 @@ void strvar_dim(const char *name, int size) {
     }
     if (size < 1) size = 1;
     if (size > MAX_STR_LEN) size = MAX_STR_LEN;
-    str_vars[i].val = basic_alloc(size);
+    free(str_vars[i].val);
+    str_vars[i].val = malloc(size);
     if (!str_vars[i].val) {
         os_print("?OUT OF MEMORY\n");
         return;
@@ -200,7 +180,8 @@ void array_dim(const char *name, int s1, int s2) {
     if (s1 < 1) s1 = 1;
     if (s2 < 0) s2 = 0;
     int total = s2 > 0 ? s1 * s2 : s1;
-    arrays[i].vals = basic_alloc(total * sizeof(double));
+    free(arrays[i].vals);
+    arrays[i].vals = malloc(total * sizeof(double));
     if (!arrays[i].vals) {
         os_print("?OUT OF MEMORY\n");
         return;
@@ -255,4 +236,18 @@ void array_set(const char *name, int i1, int i2, double val) {
         idx = i1;
     }
     arrays[a].vals[idx] = val;
+}
+
+/* ---- Free all BASIC-allocated data (called on CLR) ---- */
+
+void basic_free_vars(void) {
+    for (int i = 0; i < str_var_count; i++)
+        free(str_vars[i].val);
+    for (int i = 0; i < array_count; i++)
+        free(arrays[i].vals);
+    memset(str_vars, 0, sizeof(str_vars));
+    memset(arrays, 0, sizeof(arrays));
+    num_var_count = 0;
+    str_var_count = 0;
+    array_count = 0;
 }

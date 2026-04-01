@@ -20,6 +20,7 @@
 #include "graphics.h"
 #include "os.h"
 #include "klib.h"
+#include "malloc.h"
 #include "vga.h"
 #include "font_8x16.h"
 #include "gpu.h"
@@ -102,8 +103,8 @@ void graphics_alloc_init(void) {
     terminal_get_fb(&addr, &w, &h, &pitch, &bpp);
     if (addr && w > 0) {
         uint32_t size = pitch * h;
-        shadow_fb = os_alloc(size);
-        saved_fb = os_alloc(size);
+        shadow_fb = malloc(size);
+        saved_fb = malloc(size);
         shadow_fb_size = size;
         saved_fb_size = size;
         /* Initialize virtual resolution for text mode SCRW/SCRH */
