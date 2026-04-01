@@ -95,6 +95,11 @@
 #define API_DELAY_MS        100
 #define API_TICKS           101
 
+/* Math */
+#define API_SIN             105
+#define API_COS             106
+#define API_SQRT            107
+
 /* System */
 #define API_SHUTDOWN        110
 #define API_VERSION         111

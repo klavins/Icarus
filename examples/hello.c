@@ -2,7 +2,7 @@
  * hello.c - Hello World for ICARUS OS
  */
 
-#include "icarus.h"
+#include "os.h"
 
 int main(void) {
     os_clear_screen();

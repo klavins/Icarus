@@ -22,6 +22,7 @@
 #include "graphics.h"
 #include "klib.h"
 #include "malloc.h"
+#include "math.h"
 
 /* Version returned by API_VERSION */
 static int api_version(void) { return OS_VERSION; }
@@ -102,6 +103,11 @@ void *icarus_lookup(int id) {
     /* Timer */
     case API_DELAY_MS:      return (void *)os_delay_ms;
     case API_TICKS:         return (void *)os_ticks;
+
+    /* Math */
+    case API_SIN:           return (void *)ksin;
+    case API_COS:           return (void *)kcos;
+    case API_SQRT:          return (void *)ksqrt;
 
     /* System */
     case API_SHUTDOWN:      return (void *)os_shutdown;
