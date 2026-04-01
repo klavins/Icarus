@@ -132,4 +132,4 @@ test:
 	done
 
 clean:
-	rm -rf $(BUILD) build-efi build-efi64 $(KERNEL) $(KERNEL_FB) icarus-uefi.img icarus-uefi64.img $(ISO) isodir
+	rm -rf $(BUILD) build-efi build-efi64 build-programs $(KERNEL) $(KERNEL_FB) icarus-uefi.img icarus-uefi64.img $(ISO) isodir

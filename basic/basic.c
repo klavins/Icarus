@@ -257,6 +257,17 @@ void basic_exec(const char *line) {
         return;
     }
 
+    /* EXEC "filename" — run a C program */
+    if (tokens[0].type == TOK_IDENT && strcmp(tokens[0].string_val, "EXEC") == 0) {
+        if (tokens[1].type != TOK_STRING) {
+            os_print("?SYNTAX ERROR\n");
+            return;
+        }
+        extern int exec_program(const char *filename);
+        exec_program(tokens[1].string_val);
+        return;
+    }
+
     /* EDIT "filename" */
     if (tokens[0].type == TOK_EDIT) {
         extern void kilo_run(const char *filename);
