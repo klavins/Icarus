@@ -114,8 +114,7 @@
  */
 typedef void *(*icarus_lookup_fn)(int id);
 
-/* Entry point signature for user programs:
- *   int main(icarus_lookup_fn api) */
-typedef int (*icarus_entry_fn)(icarus_lookup_fn api);
+/* Entry point called by the kernel — receives API, argc, argv */
+typedef int (*icarus_entry_fn)(icarus_lookup_fn api, int argc, char **argv);
 
 #endif

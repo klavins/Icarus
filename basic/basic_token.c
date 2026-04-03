@@ -135,7 +135,7 @@ int basic_tokenize(const char *input, struct token *tokens, int max) {
             t->number_val = val;
         } else if (is_alpha(*p)) {
             int i = 0;
-            while (is_alnum(*p) && i < MAX_TOKEN_LEN - 1)
+            while ((is_alnum(*p) || *p == '.' || *p == '_') && i < MAX_TOKEN_LEN - 1)
                 t->string_val[i++] = to_upper(*p++);
             t->string_val[i] = '\0';
             if (*p == '$') {

@@ -400,15 +400,25 @@ Format the virtual disk. Erases all files.
 
 ### SAVE
 
-Save the current program to disk.
+Save the current program to disk. Filenames can be quoted or unquoted.
 
+    SAVE Ball.bas
     SAVE "Ball.bas"
 
 ### LOAD
 
 Load a program from disk (replaces current program).
 
+    LOAD Ball.bas
     LOAD "Ball.bas"
+
+### RUN
+
+Run the current program, or load and run a program from disk.
+
+    RUN
+    RUN Ball.bas
+    RUN "Ball.bas"
 
 ### DIR
 
@@ -420,15 +430,34 @@ List files on disk and show free space.
 
 Delete a file from disk.
 
+    DELETE Ball.bas
     DELETE "Ball.bas"
 
 ### EDIT
 
 Open a file in the built-in text editor. Creates a new file if it doesn't exist.
 
+    EDIT myfile.txt
     EDIT "myfile.txt"
+    EDIT
 
 The editor is based on [kilo](https://github.com/antirez/kilo) by Salvatore Sanfilippo. Use Ctrl-S to save, Ctrl-Q to quit, and Ctrl-F to search. See the README for full key bindings.
+
+### EXEC
+
+Run a compiled C program. Arguments are optional and comma-separated. Expressions, strings, and variables can be passed as arguments.
+
+    EXEC hello
+    EXEC hello, "world", 42
+    EXEC hello, 1+2, X*10, SIN(1)
+
+See [C.md](C.md) for how to write C programs.
+
+### MEM
+
+Show memory usage.
+
+    MEM
 
 ### DOS
 

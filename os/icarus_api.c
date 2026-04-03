@@ -120,7 +120,7 @@ void *icarus_lookup(int id) {
 /* Load and execute a C program from disk */
 #define EXEC_LOAD_ADDR 0x800000
 
-int exec_program(const char *filename) {
+int exec_program(const char *filename, int argc, char **argv) {
     int size = os_load_file(filename, (void *)EXEC_LOAD_ADDR, 32768);
     if (size <= 0) {
         os_print("?FILE NOT FOUND\n");
@@ -128,5 +128,5 @@ int exec_program(const char *filename) {
     }
 
     icarus_entry_fn entry = (icarus_entry_fn)EXEC_LOAD_ADDR;
-    return entry(icarus_lookup);
+    return entry(icarus_lookup, argc, argv);
 }

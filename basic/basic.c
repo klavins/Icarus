@@ -166,18 +166,34 @@ void basic_init(void) {
 
 /* ---- Public entry point ---- */
 
+/* Get a filename from the token after a command.
+ * Accepts both TOK_STRING ("Ball.bas") and TOK_IDENT (Ball.bas).
+ * Returns the string value, or NULL if no filename. */
+static const char *token_filename(struct token *t) {
+    if (t->type == TOK_STRING || t->type == TOK_IDENT)
+        return t->string_val;
+    return (void *)0;
+}
+
 void basic_exec(const char *line) {
     struct token tokens[MAX_TOKENS];
     int count = basic_tokenize(line, tokens, MAX_TOKENS);
+    if (count < 0) return;
+    if (count < 1 || tokens[0].type == TOK_EOL) return;
 
-    if (count < 0)
-        return;
-    if (count < 1 || tokens[0].type == TOK_EOL)
-        return;
-
-    /* RUN command */
+    /* RUN [filename] */
     if (tokens[0].type == TOK_RUN) {
-        run_program();
+        const char *fname = token_filename(&tokens[1]);
+        if (fname) {
+            static char loadbuf[16384];
+            int size = os_load_file(fname, loadbuf, sizeof(loadbuf));
+            if (size > 0) {
+                basic_program_deserialize(loadbuf, size);
+                run_program();
+            }
+        } else {
+            run_program();
+        }
         return;
     }
 
@@ -196,15 +212,12 @@ void basic_exec(const char *line) {
 
     /* MEM command -- show memory usage */
     if (tokens[0].type == TOK_IDENT && strcmp(tokens[0].string_val, "MEM") == 0) {
-        /* Count program memory */
         int prog_bytes = 0;
         for (int i = 0; i < program_count; i++)
             if (program[i].text) prog_bytes += strlen(program[i].text) + 1;
-
         size_t used = os_heap_used();
         size_t free_mem = os_heap_free();
         size_t system = used - prog_bytes;
-
         os_printf(" System:  %d bytes\n", (int)system);
         os_printf(" Program: %d bytes (%d lines)\n", prog_bytes, program_count);
         os_printf(" Free:    %d bytes\n", (int)free_mem);
@@ -219,31 +232,24 @@ void basic_exec(const char *line) {
         return;
     }
 
-    /* SAVE "filename" */
+    /* SAVE filename */
     if (tokens[0].type == TOK_SAVE) {
-        if (tokens[1].type != TOK_STRING) {
-            os_print("?SYNTAX ERROR\n");
-            return;
-        }
+        const char *fname = token_filename(&tokens[1]);
+        if (!fname) { os_print("?MISSING FILENAME\n"); return; }
         static char savebuf[16384];
         int size = basic_program_serialize(savebuf, sizeof(savebuf));
-        if (size <= 0) {
-            os_print("?NO PROGRAM\n");
-            return;
-        }
-        if (os_save_file(tokens[1].string_val, savebuf, size) == 0)
+        if (size <= 0) { os_print("?NO PROGRAM\n"); return; }
+        if (os_save_file(fname, savebuf, size) == 0)
             os_print("SAVED\n");
         return;
     }
 
-    /* LOAD "filename" */
+    /* LOAD filename */
     if (tokens[0].type == TOK_LOAD) {
-        if (tokens[1].type != TOK_STRING) {
-            os_print("?SYNTAX ERROR\n");
-            return;
-        }
+        const char *fname = token_filename(&tokens[1]);
+        if (!fname) { os_print("?MISSING FILENAME\n"); return; }
         static char loadbuf[16384];
-        int size = os_load_file(tokens[1].string_val, loadbuf, sizeof(loadbuf));
+        int size = os_load_file(fname, loadbuf, sizeof(loadbuf));
         if (size > 0) {
             basic_program_deserialize(loadbuf, size);
             os_print("LOADED\n");
@@ -257,34 +263,56 @@ void basic_exec(const char *line) {
         return;
     }
 
-    /* EXEC "filename" — run a C program */
+    /* EXEC filename [, arg, arg, ...] */
     if (tokens[0].type == TOK_IDENT && strcmp(tokens[0].string_val, "EXEC") == 0) {
-        if (tokens[1].type != TOK_STRING) {
-            os_print("?SYNTAX ERROR\n");
-            return;
+        const char *fname = token_filename(&tokens[1]);
+        if (!fname) { os_print("?MISSING FILENAME\n"); return; }
+        /* Build argv by evaluating comma-separated arguments */
+        #define MAX_EXEC_ARGS 16
+        static char *argv[MAX_EXEC_ARGS];
+        static char argbufs[MAX_EXEC_ARGS][MAX_TOKEN_LEN];
+        int argc = 0;
+        argv[argc++] = (char *)fname;
+        /* Point expression parser at tokens after the filename */
+        tok_pos = &tokens[2];
+        while (tok_pos->type != TOK_EOL && argc < MAX_EXEC_ARGS) {
+            if (tok_pos->type == TOK_COMMA) { tok_pos++; continue; }
+            if (tok_pos->type == TOK_STRING) {
+                /* String literal — use as-is */
+                strcpy(argbufs[argc], tok_pos->string_val);
+                argv[argc] = argbufs[argc];
+                argc++;
+                tok_pos++;
+            } else {
+                /* Expression — evaluate and convert to string */
+                double val = parse_expr();
+                if (val == (double)(int)val)
+                    snprintf(argbufs[argc], MAX_TOKEN_LEN, "%d", (int)val);
+                else
+                    snprintf(argbufs[argc], MAX_TOKEN_LEN, "%g", val);
+                argv[argc] = argbufs[argc];
+                argc++;
+            }
         }
-        extern int exec_program(const char *filename);
-        exec_program(tokens[1].string_val);
+        argv[argc] = (void *)0;
+        extern int exec_program(const char *filename, int argc, char **argv);
+        exec_program(fname, argc, argv);
         return;
     }
 
-    /* EDIT "filename" */
+    /* EDIT [filename] */
     if (tokens[0].type == TOK_EDIT) {
+        const char *fname = token_filename(&tokens[1]);
         extern void kilo_run(const char *filename);
-        if (tokens[1].type == TOK_STRING)
-            kilo_run(tokens[1].string_val);
-        else
-            kilo_run(0);
+        kilo_run(fname);  /* NULL is OK — opens empty editor */
         return;
     }
 
-    /* DELETE "filename" */
+    /* DELETE filename */
     if (tokens[0].type == TOK_DELETE) {
-        if (tokens[1].type != TOK_STRING) {
-            os_print("?SYNTAX ERROR\n");
-            return;
-        }
-        if (os_delete_file(tokens[1].string_val) == 0)
+        const char *fname = token_filename(&tokens[1]);
+        if (!fname) { os_print("?MISSING FILENAME\n"); return; }
+        if (os_delete_file(fname) == 0)
             os_print("DELETED\n");
         return;
     }

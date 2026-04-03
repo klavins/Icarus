@@ -113,19 +113,36 @@ Or write individual files:
 idu write "Hello.bas" hello.bas
 ```
 
-Then in ICARUS:
+Then in ICARUS (quotes are optional for filenames):
 
 ```
-LOAD "Hello.bas"
+LOAD Hello.bas
 RUN
 ```
+
+Or load and run in one step:
+
+```
+RUN Hello.bas
+```
+
+### C Programs
+
+C programs can be compiled on the host and run with `EXEC`:
+
+```
+EXEC hello
+EXEC hello, "world", 42, 1+2
+```
+
+Arguments are comma-separated and can be expressions, strings, or variables. See [C.md](C.md) for the full C programming guide.
 
 ### Editor
 
 ICARUS includes a built-in text editor based on [kilo](https://github.com/antirez/kilo) by Salvatore Sanfilippo. Launch it from the BASIC prompt:
 
 ```
-EDIT "myfile.txt"
+EDIT myfile.txt
 ```
 
 Key bindings:

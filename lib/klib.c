@@ -124,6 +124,16 @@ char *strdup(const char *s) {
     return d;
 }
 
+int strcasecmp(const char *a, const char *b) {
+    while (*a && *b) {
+        int ca = (*a >= 'a' && *a <= 'z') ? *a - 32 : *a;
+        int cb = (*b >= 'a' && *b <= 'z') ? *b - 32 : *b;
+        if (ca != cb) return ca - cb;
+        a++; b++;
+    }
+    return *(unsigned char *)a - *(unsigned char *)b;
+}
+
 char *strchr(const char *s, int c) {
     while (*s) {
         if (*s == (char)c) return (char *)s;

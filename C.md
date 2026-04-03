@@ -7,14 +7,35 @@ ICARUS can run C programs alongside BASIC. Programs are written in standard C99 
 ```c
 #include "os.h"
 
-int main(void) {
+int main(int argc, char **argv) {
     os_print("Hello, ICARUS!\n");
+    if (argc > 1) {
+        os_print("You said: ");
+        os_print(argv[1]);
+        os_print("\n");
+    }
     os_read_key();
     return 0;
 }
 ```
 
+Run it from the BASIC prompt:
+
+    EXEC hello
+    EXEC hello, "world"
+    EXEC hello, 1+2
+
 When `main` returns, control passes back to the BASIC prompt.
+
+## Arguments
+
+Programs receive `argc` and `argv` just like standard C. Arguments are passed from the BASIC `EXEC` command, comma-separated:
+
+    EXEC myprogram, "hello", 42, X+1
+
+- `argv[0]` is the program name
+- `argv[1]` onward are the arguments, converted to strings
+- Strings are passed as-is; numbers and expressions are evaluated by BASIC and converted to their string representation
 
 ## Headers
 

@@ -169,7 +169,7 @@ int fs_load(const char *name, void *data, uint32_t max_size) {
     struct fs_entry ent;
     for (uint32_t i = 0; i < hdr.file_count; i++) {
         if (read_entry(i, &ent) < 0) return -1;
-        if (strcmp(ent.name, name) == 0) {
+        if (strcasecmp(ent.name, name) == 0) {
             uint32_t size = ent.size_bytes;
             if (size > max_size) size = max_size;
             uint32_t sectors = (size + SECTOR_SIZE - 1) / SECTOR_SIZE;
@@ -196,7 +196,7 @@ int fs_delete(const char *name) {
     struct fs_entry ent;
     for (uint32_t i = 0; i < hdr.file_count; i++) {
         if (read_entry(i, &ent) < 0) return -1;
-        if (strcmp(ent.name, name) == 0) {
+        if (strcasecmp(ent.name, name) == 0) {
             /* Shift remaining entries down */
             for (uint32_t j = i; j < hdr.file_count - 1; j++) {
                 struct fs_entry next;

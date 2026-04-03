@@ -7,13 +7,13 @@
 
 #include "icarus_api.h"
 
-/* The global API lookup function — referenced by icarus.h macros */
+/* The global API lookup function — referenced by include/ header macros */
 icarus_lookup_fn _icarus_api;
 
-extern int main(void);
+extern int main(int argc, char **argv);
 
-void _start(icarus_lookup_fn api) {
+void _start(icarus_lookup_fn api, int argc, char **argv) {
     _icarus_api = api;
-    main();
+    main(argc, argv);
     /* If main returns, we just return to the kernel */
 }
