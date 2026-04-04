@@ -88,6 +88,8 @@ void *icarus_lookup(int id) {
     case API_MEMMOVE:       return (void *)memmove;
     case API_MEMCMP:        return (void *)memcmp;
     case API_SNPRINTF:      return (void *)snprintf;
+    case API_ATOI:          return (void *)atoi;
+    case API_ATOF:          return (void *)atof;
 
     /* Sound */
     case API_TONE:          return (void *)os_tone;

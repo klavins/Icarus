@@ -78,6 +78,10 @@ size_t os_cursor_col(void) { return mock_cursor_col; }
 size_t os_screen_rows(void) { return mock_screen_rows; }
 size_t os_screen_cols(void) { return mock_screen_cols; }
 
+/* Mock flush lock functions */
+void terminal_flush_lock(void) {}
+void terminal_flush_unlock(void) {}
+
 /* --- Include vt100.c directly (it only depends on the os_ functions above) --- */
 
 /* Prevent it from including the real headers */

@@ -142,6 +142,35 @@ char *strchr(const char *s, int c) {
     return (c == '\0') ? (char *)s : (void *)0;
 }
 
+int atoi(const char *s) {
+    int neg = 0, val = 0;
+    while (*s == ' ' || *s == '\t') s++;
+    if (*s == '-') { neg = 1; s++; }
+    else if (*s == '+') s++;
+    while (*s >= '0' && *s <= '9')
+        val = val * 10 + (*s++ - '0');
+    return neg ? -val : val;
+}
+
+double atof(const char *s) {
+    double val = 0, frac = 0, div = 1;
+    int neg = 0;
+    while (*s == ' ' || *s == '\t') s++;
+    if (*s == '-') { neg = 1; s++; }
+    else if (*s == '+') s++;
+    while (*s >= '0' && *s <= '9')
+        val = val * 10 + (*s++ - '0');
+    if (*s == '.') {
+        s++;
+        while (*s >= '0' && *s <= '9') {
+            frac = frac * 10 + (*s++ - '0');
+            div *= 10;
+        }
+        val += frac / div;
+    }
+    return neg ? -val : val;
+}
+
 char *strstr(const char *haystack, const char *needle) {
     if (!*needle) return (char *)haystack;
     for (; *haystack; haystack++) {

@@ -41,6 +41,10 @@ int    strcasecmp(const char *a, const char *b);
 char  *strchr(const char *s, int c);
 char  *strstr(const char *haystack, const char *needle);
 
+/* String to number */
+int    atoi(const char *s);
+double atof(const char *s);
+
 /* Character classification */
 int isdigit(int c);
 int isalpha(int c);

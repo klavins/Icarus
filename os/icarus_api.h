@@ -79,6 +79,8 @@
 #define API_MEMMOVE         70
 #define API_MEMCMP          71
 #define API_SNPRINTF        72
+#define API_ATOI            73
+#define API_ATOF            74
 
 /* Sound */
 #define API_TONE            80

@@ -22,4 +22,8 @@
 /* snprintf is variadic — get the function pointer, then call it normally */
 #define snprintf                ((int (*)(char*, size_t, const char*, ...))_icarus_api(API_SNPRINTF))
 
+/* String to number */
+#define atoi(s)                 ((int (*)(const char*))_icarus_api(API_ATOI))(s)
+#define atof(s)                 ((double (*)(const char*))_icarus_api(API_ATOF))(s)
+
 #endif
